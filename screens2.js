@@ -29,6 +29,7 @@ VIEWS.library = function(){
           <div class="row" style="margin-top:8px;gap:6px">
             <button class="btn sm" style="flex:1" onclick="showDrill('${d.id}')">פרטים</button>
             <button class="btn sm primary" style="flex:1" onclick="addToPlan('${d.id}')">+ לאימון</button>
+            <button class="btn sm ghost" onclick="openBoard('${d.id}')" title="לוח טקטי">▦</button>
             ${d.mine?`<button class="btn sm ghost" onclick="drillForm('${d.id}')">✎</button>`:''}
           </div>
         </div></div>`).join('')||'<div class="empty">לא נמצאו תרגילים.</div>'}</div>`);
@@ -36,8 +37,11 @@ VIEWS.library = function(){
 };
 function setLF(k,v){LF[k]=LF[k]===v?null:v;go('library');}
 
-function drillForm(id){
-  const d=id?allDrills().find(x=>x.id===id):{cat:'tech',ages:[S.team?.age_profile||'b'],min:10,players:'8–12',area:'20×20',points:[],prog:[]};
+function drillForm(id, preset){
+  const d = id ? allDrills().find(x=>x.id===id)
+          : preset ? Object.assign({},preset,{id:null,mine:true})
+          : {cat:'tech',ages:[S.team?.age_profile||'b'],min:10,players:'8–12',area:'20×20',points:[],prog:[]};
+  const diag = window.__diag || d.diag || {items:[]};
   sheet(`<h2>${id?'עריכת תרגיל':'תרגיל חדש'}</h2><div class="stack" style="margin-top:12px">
     <label class="f">שם<input id="dn" value="${esc(d.name||'')}"></label>
     <div class="grid2">
@@ -54,8 +58,13 @@ function drillForm(id){
     <label class="f">מהלך<textarea id="dd" rows="3">${esc(d.desc||'')}</textarea></label>
     <label class="f">דגשים (שורה לכל אחד)<textarea id="dpt" rows="3">${esc((d.points||[]).join('\n'))}</textarea></label>
     <label class="f">התקדמויות (שורה לכל אחת)<textarea id="dpr" rows="2">${esc((d.prog||[]).join('\n'))}</textarea></label>
+    <div class="f"><span>דיאגרמה</span>
+      ${diag.items&&diag.items.length?svgDiag(diag):'<p class="xs muted">עדיין אין ציור לתרגיל הזה.</p>'}
+      <button class="btn sm" style="margin-top:6px" id="ddraw">✏️ ${diag.items&&diag.items.length?'עריכת הציור':'ציור על הלוח'}</button></div>
     <button class="btn primary big" id="dsv">שמירה</button>
     ${id?'<button class="btn danger" id="ddel">מחיקה</button>':''}</div>`);
+  $('#ddraw').onclick=()=>{ closeSheet(); BOARD.items=JSON.parse(JSON.stringify(diag.items||[]));
+    go('board',{keep:true, back:'library'}); };
   $('#dsv').onclick=async()=>{
     const ages=$$('#dages .chip.on').map(b=>b.dataset.a);
     if(!$('#dn').value.trim()) return toast('חסר שם');
@@ -65,11 +74,11 @@ function drillForm(id){
       equip:$('#de').value,setup:$('#ds').value,descr:$('#dd').value,
       points:$('#dpt').value.split('\n').map(s=>s.trim()).filter(Boolean),
       prog:$('#dpr').value.split('\n').map(s=>s.trim()).filter(Boolean),
-      src:'המועדון',diagram:d.diag||{items:[]}};
+      src:'המועדון',diagram:diag};
     const {error}=await sb.from('coach_drills').upsert(row);
     if(error) return toast('שגיאה: '+error.message);
     const {data}=await sb.from('coach_drills').select('*').eq('club_id',S.club.id); S.dbDrills=data||[];
-    closeSheet(); go('library'); toast('נשמר');
+    window.__diag=null; closeSheet(); go('library'); toast('נשמר');
   };
   if(id) $('#ddel').onclick=async()=>{ if(!confirm('למחוק?'))return;
     await sb.from('coach_drills').delete().eq('id',id);
@@ -470,6 +479,7 @@ VIEWS.more = function(){
   screen('עוד', `<div class="stack">
     <button class="btn big" onclick="go('reports')">📊 דוחות קבוצה</button>
     <button class="btn big" onclick="go('tests')">⏱ מדידות זמן ומרחק</button>
+    <button class="btn big" onclick="openBoard()">▦ לוח טקטי</button>
     <button class="btn big" onclick="go('match')">🥅 מצב משחק</button>
     <button class="btn big" onclick="go('discipline')">📔 יומן משמעת</button>
     <button class="btn big" onclick="go('parents')">👨‍👩‍👦 הורים והזמנות</button>
