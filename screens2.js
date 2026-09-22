@@ -242,6 +242,7 @@ async function finishMatch(){
   const m=S.match; S.match=null; MATCH={clock:0,timer:null,running:false,half:1};
   toast('המשחק נשמר'); go('home');
 }
+
 /* ---------- PLAYER CARD ---------- */
 VIEWS.player = async function(pid){
   const p=S.players.find(x=>x.id===pid); if(!p) return go('squad');
@@ -416,3 +417,141 @@ VIEWS.tests = function(){
   };
   draw();
 };
+
+/* ---------- REPORTS ---------- */
+VIEWS.reports = async function(){
+  screen('דוחות', '<div class="empty">טוען…</div>');
+  const ids=S.players.map(p=>p.id);
+  const [{data:obs},{data:att},{data:sess}] = await Promise.all([
+    ids.length?sb.from('coach_observations').select('player_id,attribute,score,source,at').in('player_id',ids).eq('voided',false).limit(6000):{data:[]},
+    sb.from('coach_attendance').select('player_id,present,session_id,coach_sessions!inner(team_id)').eq('coach_sessions.team_id',S.team.id).limit(1500),
+    sb.from('coach_sessions').select('id,date,status,focus').eq('team_id',S.team.id).eq('status','done').limit(60)
+  ]);
+  const all=[...(obs||[]),...LOCAL_OBS.filter(o=>ids.includes(o.player_id))];
+  const byP={}; all.forEach(o=>(byP[o.player_id]=byP[o.player_id]||[]).push(o));
+  const rows=S.players.map(p=>{
+    const sc=scoreFromObs(byP[p.id]||[]);
+    const vals=Object.values(sc).map(x=>x.score).filter(v=>v!=null);
+    const tr=Object.values(sc).map(x=>x.trend).filter(v=>v!=null);
+    const a=(att||[]).filter(x=>x.player_id===p.id);
+    return {p, ov:vals.length?vals.reduce((x,y)=>x+y,0)/vals.length:null,
+      trend:tr.length?tr.reduce((x,y)=>x+y,0)/tr.length:null,
+      att:a.length?a.filter(x=>x.present==='yes').length/a.length:null, n:a.length};
+  });
+  const up=[...rows].filter(r=>r.trend!=null).sort((a,b)=>b.trend-a.trend).slice(0,3);
+  const down=[...rows].filter(r=>r.trend!=null&&r.trend<-0.5).sort((a,b)=>a.trend-b.trend).slice(0,3);
+  // team weakest attributes
+  const agg={}; all.forEach(o=>{(agg[o.attribute]=agg[o.attribute]||[]).push(o.score);});
+  const weak=Object.entries(agg).map(([k,v])=>({k,avg:v.reduce((a,b)=>a+b,0)/v.length,n:v.length}))
+    .filter(x=>x.n>=5).sort((a,b)=>a.avg-b.avg).slice(0,3);
+  $('.wrap').innerHTML=`
+    <div class="card"><h2>${esc(S.team.name)}</h2>
+      <p class="muted sm">${(sess||[]).length} אימונים הושלמו · ${all.length} תצפיות · ${S.players.length} שחקנים</p></div>
+    ${weak.length?`<div class="hd"><h2>מה לאמן בשבוע הבא</h2></div><div class="card">
+      ${weak.map(w=>`<div class="attr"><span>${esc(ATTR_LABEL(w.k))}</span>
+        <div class="bar"><i style="width:${(w.avg/5*100).toFixed(0)}%;background:var(--warn)"></i></div>
+        <span class="v num">${w.avg.toFixed(1)}</span><span class="tr xs muted">${w.n}</span></div>`).join('')}
+      <p class="xs muted" style="margin-top:8px">הממוצע הנמוך ביותר בקבוצה — שווה לבנות סביבו את הדגש הבא.</p></div>`:''}
+    ${up.length?`<div class="hd"><h2>הכי התקדמו</h2></div><div class="stack">
+      ${up.map(r=>`<div class="prow" onclick="go('player','${r.p.id}')"><div class="av">${esc(initials(r.p.name))}</div>
+        <div class="pname"><b>${esc(r.p.name)}</b></div><span class="pill ok" dir="ltr">+${r.trend.toFixed(1)}</span></div>`).join('')}</div>`:''}
+    ${down.length?`<div class="hd"><h2>בירידה</h2></div><div class="stack">
+      ${down.map(r=>`<div class="prow" onclick="go('player','${r.p.id}')"><div class="av">${esc(initials(r.p.name))}</div>
+        <div class="pname"><b>${esc(r.p.name)}</b></div><span class="pill bad" dir="ltr">${r.trend.toFixed(1)}</span></div>`).join('')}</div>`:''}
+    <div class="hd"><h2>נוכחות</h2></div>
+    <div class="scroll-x"><table class="tbl"><tr><th>שחקן</th><th>נוכחות</th><th>ציון</th></tr>
+      ${rows.sort((a,b)=>(a.att??1)-(b.att??1)).map(r=>`<tr onclick="go('player','${r.p.id}')">
+        <td>${esc(r.p.name)}</td><td class="num">${r.att!=null?Math.round(r.att*100)+'%':'—'} <span class="xs muted">(${r.n})</span></td>
+        <td class="num">${r.ov!=null?r.ov.toFixed(1):'—'}</td></tr>`).join('')}</table></div>`;
+};
+
+/* ---------- MORE / SETTINGS ---------- */
+VIEWS.more = function(){
+  screen('עוד', `<div class="stack">
+    <button class="btn big" onclick="go('reports')">📊 דוחות קבוצה</button>
+    <button class="btn big" onclick="go('tests')">⏱ מדידות זמן ומרחק</button>
+    <button class="btn big" onclick="go('match')">🥅 מצב משחק</button>
+    <button class="btn big" onclick="go('discipline')">📔 יומן משמעת</button>
+    <button class="btn big" onclick="go('parents')">👨‍👩‍👦 הורים והזמנות</button>
+    <button class="btn big" onclick="go('roster')">📥 ייבוא רשימת שחקנים</button>
+    <button class="btn big" onclick="go('teamedit')">⚙️ הגדרות קבוצה</button>
+    <button class="btn big" onclick="go('settings')">🏫 מועדון וקבוצות</button>
+    <div class="sep"></div>
+    <p class="xs muted">${esc(S.club?.name||'')} · ${esc(S.user?.email||'')} · ${S.role==='coach'?'מאמן':S.role}</p>
+    <p class="xs muted">ממתינים לסנכרון: ${QUEUE.length}</p>
+    <button class="btn ghost" onclick="flushQueue()">סנכרון עכשיו</button>
+    <button class="btn danger" onclick="signOut()">יציאה</button></div>`);
+};
+async function signOut(){ await sb.auth.signOut(); LS('dev',null); location.reload(); }
+
+VIEWS.discipline = async function(){
+  screen('יומן משמעת', '<div class="empty">טוען…</div>');
+  const ids=S.players.map(p=>p.id);
+  const {data}=ids.length?await sb.from('coach_discipline').select('*').in('player_id',ids).order('at',{ascending:false}).limit(60):{data:[]};
+  const flag={}; (data||[]).filter(d=>!d.positive&&daysAgo(d.at)<=30).forEach(d=>flag[d.player_id]=(flag[d.player_id]||0)+1);
+  $('.wrap').innerHTML=`
+    ${Object.entries(flag).filter(([,n])=>n>=3).map(([pid,n])=>{const p=S.players.find(x=>x.id===pid)||{name:'—'};
+      return `<div class="prow" style="border-color:var(--bad)"><div class="av">${esc(initials(p.name))}</div>
+        <div class="pname"><b>${esc(p.name)}</b><span class="xs muted">${n} אירועים ב-30 יום</span></div><span class="pill bad">דגל</span></div>`;}).join('')}
+    <div class="hd"><h2>רישומים אחרונים</h2></div>
+    <div class="stack">${(data||[]).map(d=>{const p=S.players.find(x=>x.id===d.player_id)||{name:'—'};
+      return `<div class="prow" onclick="go('player','${d.player_id}')"><div class="av">${esc(initials(p.name))}</div>
+        <div class="pname"><b class="sm">${esc(p.name)} — ${esc(d.kind)}</b>
+        <span class="xs muted">${fmtDate(d.at)}${d.action?' · '+esc(d.action):''}${d.parent_notified_at?' · הורה עודכן':''}</span></div>
+        <span class="pill ${d.positive?'ok':d.severity>=3?'bad':'warn'}">${d.positive?'חיובי':d.severity}</span></div>`;}).join('')||'<p class="muted sm">אין רישומים.</p>'}</div>`;
+};
+
+VIEWS.teamedit = function(){
+  const t=S.team; if(!t) return go('settings');
+  screen('הגדרות קבוצה', `<div class="card stack">
+    <label class="f">שם<input id="tn" value="${esc(t.name)}"></label>
+    <label class="f">קבוצת גיל<select id="tap">${Object.entries(AGES).map(([k,v])=>`<option value="${k}" ${k===t.age_profile?'selected':''}>${v}</option>`).join('')}</select></label>
+    <div class="grid2">
+      <label class="f">אורך אימון<input id="tsm" type="number" class="num" value="${t.session_minutes}"></label>
+      <label class="f">סולם דירוג<select id="trs"><option value="3" ${t.rating_scale===3?'selected':''}>3 כוכבים</option><option value="5" ${t.rating_scale===5?'selected':''}>1–5</option></select></label>
+    </div>
+    <label class="f">פורמט משחק<select id="tmf">${['4v4','5v5','7v7','9v9','11v11'].map(x=>`<option ${x===t.match_format?'selected':''}>${x}</option>`).join('')}</select></label>
+    <label class="f row" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="tlm" ${t.league_mode?'checked':''} style="width:auto"> משחקת בליגה</label>
+    <label class="f row" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="trp" ${t.rpe_enabled?'checked':''} style="width:auto"> RPE (עומס מורגש) פעיל</label>
+    <label class="f row" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="tsp" ${t.show_scores_to_player?'checked':''} style="width:auto"> השחקן רואה ציון מספרי</label>
+    <label class="f row" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="tpp" ${t.parent_sees_scores?'checked':''} style="width:auto"> ההורה רואה ציונים</label>
+    <button class="btn primary big" id="tsv">שמירה</button>
+  </div>
+  <div class="card" style="margin-top:10px"><h3>תכונות שמדורגות בקבוצה הזו</h3>
+    <div class="chips" style="margin-top:8px">${teamAttrs(true).map(a=>`<span class="chip">${esc(a.label)}</span>`).join('')}</div>
+    <p class="xs muted" style="margin-top:8px">נקבע אוטומטית לפי קבוצת הגיל.</p></div>`);
+  $('#tsv').onclick=async()=>{
+    const row={name:$('#tn').value.trim()||t.name,age_profile:$('#tap').value,session_minutes:+$('#tsm').value||60,
+      rating_scale:+$('#trs').value,match_format:$('#tmf').value,league_mode:$('#tlm').checked,
+      rpe_enabled:$('#trp').checked,show_scores_to_player:$('#tsp').checked,parent_sees_scores:$('#tpp').checked};
+    const {error}=await sb.from('coach_teams').update(row).eq('id',t.id);
+    if(error) return toast('שגיאה: '+error.message);
+    Object.assign(S.team,row); S.teams=S.teams.map(x=>x.id===t.id?S.team:x);
+    toast('נשמר'); go('home');
+  };
+};
+
+VIEWS.settings = function(){
+  screen('מועדון וקבוצות', `
+    <div class="card"><h2>${esc(S.club?.name||'')}</h2><p class="muted sm">${S.teams.length} קבוצות</p></div>
+    <div class="hd"><h2>קבוצות</h2></div>
+    <div class="stack">${S.teams.map(t=>`<div class="prow" onclick="pickTeam('${t.id}')">
+      <div class="av">${esc(t.name[0]||'')}</div><div class="pname"><b>${esc(t.name)}</b>
+      <span class="xs muted">${AGES[t.age_profile]} · ${t.session_minutes} דק׳${t.league_mode?' · ליגה':''}</span></div>
+      ${t.id===S.team?.id?'<span class="pill ok">נוכחית</span>':''}</div>`).join('')}</div>
+    <div class="card stack" style="margin-top:14px">
+      <h3>קבוצה חדשה</h3>
+      <label class="f">שם<input id="ntn" placeholder="כיתה ה׳"></label>
+      <label class="f">קבוצת גיל<select id="ntap">${Object.entries(AGES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
+      <label class="f">אורך אימון<input id="ntsm" type="number" class="num" value="60"></label>
+      <button class="btn primary" id="ntmk">יצירה</button>
+    </div>`);
+  $('#ntmk').onclick=async()=>{
+    const name=$('#ntn').value.trim(); if(!name) return toast('חסר שם');
+    const {data,error}=await sb.from('coach_teams').insert({club_id:S.club.id,name,age_profile:$('#ntap').value,
+      session_minutes:+$('#ntsm').value||60,coach_id:S.user.id}).select().single();
+    if(error) return toast('שגיאה: '+error.message);
+    S.teams.push(data); S.team=data; await loadTeam(); toast('נוצרה'); go('home');
+  };
+};
+
