@@ -482,6 +482,7 @@ VIEWS.more = function(){
     <button class="btn big" onclick="openBoard()">▦ לוח טקטי</button>
     <button class="btn big" onclick="go('match')">🥅 מצב משחק</button>
     <button class="btn big" onclick="go('discipline')">📔 יומן משמעת</button>
+    <button class="btn big" onclick="go('broadcast')">💬 עדכון לקבוצת הוואטסאפ</button>
     <button class="btn big" onclick="go('parents')">👨‍👩‍👦 הורים והזמנות</button>
     <button class="btn big" onclick="go('roster')">📥 ייבוא רשימת שחקנים</button>
     <button class="btn big" onclick="go('teamedit')">⚙️ הגדרות קבוצה</button>
