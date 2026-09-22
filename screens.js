@@ -250,6 +250,7 @@ VIEWS.live = function(){
       <div class="bar"><i id="pbar"></i></div>
       <div class="row wrap" style="margin-top:10px;gap:6px">
         <button class="btn sm" onclick="showDrill('${it.id}')">פרטי התרגיל</button>
+        <button class="btn sm" onclick="openBoard('${it.id}')">▦ לוח</button>
         <button class="btn sm" onclick="prevDrill()" ${LIVE.idx?'':'disabled'}>◀ קודם</button>
         <button class="btn sm primary" onclick="nextDrill()">${LIVE.idx<list.length-1?'הבא ▶':'סיום אימון'}</button>
       </div>
