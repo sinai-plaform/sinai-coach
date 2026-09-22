@@ -257,3 +257,64 @@ async function inviteAll(mode){
     </div>`);
 }
 
+/* ---------- group updates: free, through the coach's own WhatsApp groups ---------- */
+function waText(t){ window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank'); }
+async function copyText(t, btn){
+  try{ await navigator.clipboard.writeText(t); }
+  catch(e){ const a=document.createElement('textarea'); a.value=t; document.body.appendChild(a);
+    a.select(); document.execCommand('copy'); a.remove(); }
+  if(btn){ const o=btn.textContent; btn.textContent='הועתק ✓'; setTimeout(()=>btn.textContent=o,1400); }
+}
+const dayName = d=>['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][new Date(d).getDay()];
+
+VIEWS.broadcast = async function(){
+  if(!S.team) return go('home');
+  screen('עדכון לקבוצה', '<div class="empty">טוען…</div>');
+  const [{data:nx},{data:lt},{data:st}] = await Promise.all([
+    sb.from('coach_sessions').select('*').eq('team_id',S.team.id).gte('date',today()).order('date').limit(1),
+    sb.from('coach_sessions').select('*').eq('team_id',S.team.id).eq('status','done').order('date',{ascending:false}).limit(1),
+    sb.from('coach_parent_status').select('registered').eq('club_id',S.club.id)
+  ]);
+  const next = (nx||[])[0], last = (lt||[])[0];
+  const pending = (st||[]).filter(g=>!g.registered).length;
+  const when = s => s ? `יום ${dayName(s.date)} ${fmtDate(s.date)}${s.start_time?' בשעה '+s.start_time.slice(0,5):''}` : '';
+  const sign = `\n\n— ${S.team.name}, ${S.club.name}`;
+
+  const T = [];
+  if(next) T.push({k:'reminder', t:'תזכורת לאימון הבא',
+    b:`תזכורת: אימון ${when(next)}.${next.focus?`\nהדגש: ${next.focus}.`:''}\nלהביא בקבוק מים ונעלי כדורגל. נתראה!${sign}`});
+  if(next) T.push({k:'cancel', t:'ביטול אימון',
+    b:`שימו לב — האימון ב${when(next)} מבוטל.\nנעדכן בהקדם לגבי השלמה. מתנצל על אי הנוחות.${sign}`});
+  if(next) T.push({k:'change', t:'שינוי שעה או מקום',
+    b:`עדכון לאימון ב${when(next)}: יש שינוי ב___ (שעה / מקום).\nאנא שימו לב ועדכנו את הילדים.${sign}`});
+  if(last) T.push({k:'summary', t:'סיכום האימון האחרון',
+    b:`סיכום האימון מ${fmtDate(last.date)}${last.focus?` — ${last.focus}`:''}.\nהילדים עבדו יפה. כל הכבוד!${sign}`});
+  if(pending) T.push({k:'invite', t:`${pending} הורים טרם נכנסו לאפליקציה`,
+    b:`הורים יקרים — מי שעדיין לא נכנס לאפליקציה של ${S.club.name}, הקישור האישי נשלח אליכם בהודעה פרטית.\nהכניסה בלחיצה אחת, בלי סיסמה. שם תוכלו לראות נוכחות, יעדים ועדכונים.${sign}`});
+  T.push({k:'general', t:'הודעה חופשית', b:`הורים יקרים,\n\n${sign}`});
+
+  $('.wrap').innerHTML = `
+    <div class="card"><p class="sm">בחרו הודעה — היא נכתבת מהנתונים באפליקציה. לחיצה על "וואטסאפ" פותחת את
+      רשימת הצ׳אטים שלכם ואתם בוחרים את הקבוצה הרלוונטית.</p>
+      <p class="xs muted" style="margin-top:8px">חינם לגמרי — ההודעה יוצאת מהוואטסאפ שלכם, לא דרך שרת.</p></div>
+    <div class="alert ok" style="margin:12px 0">
+      בקבוצה שולחים רק מידע כללי. כל דבר שנוגע לילד מסוים — נוכחות, ציון, התנהגות, תשלום —
+      יוצא בהודעה פרטית להורה שלו בלבד, מתוך כרטיס השחקן.</div>
+    <div class="stack">
+      ${T.map((x,i)=>`<div class="card">
+        <div class="spread"><h3>${esc(x.t)}</h3></div>
+        <textarea id="bc${i}" rows="${x.k==='general'?4:5}" style="margin-top:8px">${esc(x.b)}</textarea>
+        <div class="row" style="gap:8px;margin-top:8px">
+          <button class="btn primary sm" style="flex:2" onclick="bcSend(${i},'${x.k}')">שליחה בוואטסאפ</button>
+          <button class="btn sm" style="flex:1" onclick="copyText($('#bc${i}').value, this)">העתקה</button>
+        </div></div>`).join('')}
+    </div>`;
+};
+async function bcSend(i, kind){
+  const body = $('#bc'+i).value.trim(); if(!body) return;
+  waText(body);
+  await push('coach_messages',{club_id:S.club.id, team_id:S.team.id, kind, body,
+    channel:'whatsapp_group', sent_at:new Date().toISOString(), by_user:S.user.id});
+  toast('נרשם ביומן ההודעות');
+}
+
