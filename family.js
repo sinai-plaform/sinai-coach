@@ -82,9 +82,10 @@ async function famHome(){
   const cm=$('#cMedia');
   if(cm) cm.onchange=async()=>{
     const v=cm.checked;
-    const {error}=await sb.from('coach_guardians')
-      .update({media_consent:v, media_consent_at:new Date().toISOString()}).eq('id',FAM.guardian.id);
-    if(error){ cm.checked=!v; return toast('לא נשמר'); }
+    const {data,error}=await sb.from('coach_guardians')
+      .update({media_consent:v, media_consent_at:new Date().toISOString()})
+      .eq('id',FAM.guardian.id).select('media_consent');
+    if(error || !data || !data.length){ cm.checked=!v; return toast('לא נשמר'); }
     FAM.guardian.media_consent=v; toast(v?'אושר':'בוטל');
   };
 }
@@ -143,8 +144,9 @@ async function famKid(id){
   const kl=$('#kidLogin');
   if(kl) kl.onchange=async()=>{
     const v=kl.checked;
-    const {error}=await sb.from('coach_players').update({login_enabled:v}).eq('id',k.id);
-    if(error){ kl.checked=!v; return toast('לא נשמר'); }
+    // the server decides; a silent no-op must never look like a save
+    const {data,error}=await sb.rpc('coach_set_player_login',{p_player:k.id,p_on:v});
+    if(error || data!==v){ kl.checked=!v; return toast(error?'לא נשמר: '+error.message:'לא נשמר'); }
     k.login_enabled=v;
     $('#kidLink').innerHTML = v
       ? `<p class="xs muted" style="margin-top:10px">בקש מהמאמן קישור כניסה עבור ${esc(k.name.split(' ')[0])}.</p>`
@@ -158,3 +160,4 @@ function famNotify(id){
   const msg=`שלום, לגבי ${k.name}: `;
   window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
 }
+
