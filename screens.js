@@ -33,7 +33,7 @@ VIEWS.home = async function(){
         :`<button class="btn primary big" onclick="go('plan')">בניית אימון</button>`}
       <div class="grid2" style="margin-top:8px">
         <button class="btn" onclick="go('match')">מצב משחק</button>
-        <button class="btn" onclick="go('tests')">מדידות</button>
+        <button class="btn" onclick="go('broadcast')">עדכון להורים</button>
       </div>
     </div>
 
