@@ -157,6 +157,14 @@ label.f{display:grid;gap:5px;font-size:13px;color:var(--muted)}
 
 /* diagram */
 .dg{width:100%;aspect-ratio:3/2;border-radius:10px;display:block}
+.bwrap{padding-bottom:10px}
+.bpitch{border:1px solid var(--line);touch-action:none;user-select:none}
+.btools{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin-top:8px}
+.btool{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 2px;
+  font-size:10.5px;line-height:1.25;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted)}
+.btool span{font-size:17px;line-height:1}
+.btool.on{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 2px rgba(221,106,44,.2)}
+@media (orientation:landscape){.bpitch{max-height:64vh;width:auto;margin:0 auto}}
 .toast{position:fixed;bottom:calc(86px + var(--safeB));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);
   padding:9px 16px;border-radius:999px;font-size:13.5px;z-index:70;opacity:0;transition:opacity .2s;pointer-events:none;max-width:88vw;text-align:center}
 .toast.show{opacity:1}
@@ -183,10 +191,11 @@ table.tbl th{color:var(--muted);font-weight:500;font-size:12.5px}
 <script src="drills.js?v=7e99e866"></script>
 <script src="config.js?v=10dc1681"></script>
 <script src="core.js?v=2b1420bd"></script>
-<script src="screens.js?v=9e68dbbb"></script>
-<script src="screens2.js?v=bbf957a8"></script>
+<script src="screens.js?v=8301fff7"></script>
+<script src="screens2.js?v=508d09ce"></script>
 <script src="roster.js?v=e75d21e0"></script>
 <script src="family.js?v=8012e9a1"></script>
+<script src="board.js?v=9477e24c"></script>
 </body>
 </html>
 
