@@ -322,6 +322,9 @@ VIEWS.player = async function(pid){
       <b class="sm">${esc(ATTR_LABEL(o.attribute))} — ${o.score}</b>
       <span class="xs muted">${esc(o.tag||({drill:'תרגיל',match:'משחק',test:'מבחן',tag:'תגית',challenge:'אתגר'})[o.source]||'')} · ${fmtDate(o.at)}</span></div></div>`).join('')||'<p class="muted sm">אין עדיין תצפיות.</p>'}</div>
 
+    <div class="hd"><h2>מסמכים וכשירות</h2><button class="btn sm" onclick="healthForm('${pid}')">עריכה</button></div>
+    <div class="card">${healthRows(p,S.team)}</div>
+
     <button class="btn big" style="margin-top:16px" onclick="parentMsg('${pid}')">הודעה להורה</button>`;
 };
 function radar(attrs,sc){
@@ -368,7 +371,7 @@ function discForm(pid){
     const p=S.players.find(x=>x.id===pid);
     const txt=`שלום, כאן המאמן של ${S.team.name}. רציתי לעדכן לגבי ${p.name}: ${row.kind}${row.note?' — '+row.note:''}. ${row.action?'טיפלנו בזה: '+row.action+'. ':''}נשמח לדבר.`;
     const ph=(p.parent_phone||'').replace(/\D/g,'').replace(/^0/,'972');
-    window.open('https://wa.me/'+(ph||'')+'?text='+encodeURIComponent(txt),'_blank');
+    await waOpen('https://wa.me/'+(ph||'')+'?text='+encodeURIComponent(txt));
     closeSheet(); go('player',pid);
   };
 }
@@ -379,7 +382,7 @@ function parentMsg(pid){
   const up=Object.entries(sc).filter(([k,v])=>v.trend>=1).map(([k])=>ATTR_LABEL(k));
   const txt=`שלום! עדכון קצר על ${p.name} מהחודש האחרון ב${S.team.name}: ${up.length?'התקדמות יפה ב'+up.join(', ')+'. ':'עובד יפה באימונים. '}נמשיך לעבוד. תודה!`;
   const ph=(p.parent_phone||'').replace(/\D/g,'').replace(/^0/,'972');
-  window.open('https://wa.me/'+(ph||'')+'?text='+encodeURIComponent(txt),'_blank');
+  waOpen('https://wa.me/'+(ph||'')+'?text='+encodeURIComponent(txt));
 }
 
 /* ---------- TESTS ---------- */
@@ -484,6 +487,7 @@ VIEWS.more = function(){
     <button class="btn big" onclick="go('discipline')">📔 יומן משמעת</button>
     <button class="btn big" onclick="go('broadcast')">💬 עדכון לקבוצת הוואטסאפ</button>
     <button class="btn big" onclick="go('parents')">👨‍👩‍👦 הורים והזמנות</button>
+    <button class="btn big" onclick="go('docs')">📋 מסמכים וכשירות</button>
     <button class="btn big" onclick="go('roster')">📥 ייבוא רשימת שחקנים</button>
     <button class="btn big" onclick="go('teamedit')">⚙️ הגדרות קבוצה</button>
     <button class="btn big" onclick="go('settings')">🏫 מועדון וקבוצות</button>
@@ -522,7 +526,9 @@ VIEWS.teamedit = function(){
       <label class="f">סולם דירוג<select id="trs"><option value="3" ${t.rating_scale===3?'selected':''}>3 כוכבים</option><option value="5" ${t.rating_scale===5?'selected':''}>1–5</option></select></label>
     </div>
     <label class="f">פורמט משחק<select id="tmf">${['4v4','5v5','7v7','9v9','11v11'].map(x=>`<option ${x===t.match_format?'selected':''}>${x}</option>`).join('')}</select></label>
-    <label class="f row" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="tlm" ${t.league_mode?'checked':''} style="width:auto"> משחקת בליגה</label>
+    <label class="f">מסגרת תחרותית<select id="tlp">${Object.entries(LEAGUE).map(([k,v])=>`<option value="${k}" ${k===teamProfile(t)?'selected':''}>${esc(v.label)}</option>`).join('')}</select></label>
+    <p class="xs muted" id="tlpn" style="margin:-6px 0 0">${esc(LEAGUE[teamProfile(t)].note)}</p>
+    <label class="f row" id="tlprm" style="flex-direction:row;align-items:center;gap:8px${teamProfile(t)==='ifa'?';display:none':''}"><input type="checkbox" id="trm" ${t.requires_medical?'checked':''} style="width:auto"> הליגה דורשת אישור רפואי</label>
     <label class="f row" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="trp" ${t.rpe_enabled?'checked':''} style="width:auto"> RPE (עומס מורגש) פעיל</label>
     <label class="f row" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="tsp" ${t.show_scores_to_player?'checked':''} style="width:auto"> השחקן רואה ציון מספרי</label>
     <label class="f row" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="tpp" ${t.parent_sees_scores?'checked':''} style="width:auto"> ההורה רואה ציונים</label>
@@ -531,9 +537,14 @@ VIEWS.teamedit = function(){
   <div class="card" style="margin-top:10px"><h3>תכונות שמדורגות בקבוצה הזו</h3>
     <div class="chips" style="margin-top:8px">${teamAttrs(true).map(a=>`<span class="chip">${esc(a.label)}</span>`).join('')}</div>
     <p class="xs muted" style="margin-top:8px">נקבע אוטומטית לפי קבוצת הגיל.</p></div>`);
+  $('#tlp').onchange=()=>{ const v=$('#tlp').value;
+    $('#tlpn').textContent=LEAGUE[v].note;
+    $('#tlprm').style.display = v==='ifa' ? 'none' : ''; };
   $('#tsv').onclick=async()=>{
+    const lp=$('#tlp').value;
     const row={name:$('#tn').value.trim()||t.name,age_profile:$('#tap').value,session_minutes:+$('#tsm').value||60,
-      rating_scale:+$('#trs').value,match_format:$('#tmf').value,league_mode:$('#tlm').checked,
+      rating_scale:+$('#trs').value,match_format:$('#tmf').value,
+      league_profile:lp, league_mode:lp!=='school', requires_medical: lp==='ifa' || $('#trm').checked,
       rpe_enabled:$('#trp').checked,show_scores_to_player:$('#tsp').checked,parent_sees_scores:$('#tpp').checked};
     const {error}=await sb.from('coach_teams').update(row).eq('id',t.id);
     if(error) return toast('שגיאה: '+error.message);
@@ -545,6 +556,15 @@ VIEWS.teamedit = function(){
 VIEWS.settings = function(){
   screen('מועדון וקבוצות', `
     <div class="card"><h2>${esc(S.club?.name||'')}</h2><p class="muted sm">${S.teams.length} קבוצות</p></div>
+    <div class="card stack" style="margin-top:10px">
+      <div class="togrow"><div class="t"><b>מצב שומר שבת</b>
+        <span>האפליקציה לא תשלח הודעות בשבת. ${isShabbat()?'<b>שבת עכשיו.</b>':''}</span></div>
+        <label class="sw"><input type="checkbox" id="shb" ${S.club?.shabbat_mode?'checked':''}><i></i></label></div>
+      <label class="f">עיר (לחישוב זמני כניסת ויציאת שבת)
+        <input id="shc" list="shcl" value="${esc(S.club?.city||'תל אביב')}" placeholder="תל אביב">
+        <datalist id="shcl">${Object.keys(CITIES).map(c=>`<option value="${esc(c)}">`).join('')}</datalist></label>
+      <p class="xs muted">${(()=>{const w=shabbatWindow(new Date());return w?`השבת הקרובה: כניסה ${hhmm(w.start)} · צאת השבת ${hhmm(w.end)}`:'';})()}</p>
+    </div>
     <div class="hd"><h2>קבוצות</h2></div>
     <div class="stack">${S.teams.map(t=>`<div class="prow" onclick="pickTeam('${t.id}')">
       <div class="av">${esc(t.name[0]||'')}</div><div class="pname"><b>${esc(t.name)}</b>
@@ -557,6 +577,22 @@ VIEWS.settings = function(){
       <label class="f">אורך אימון<input id="ntsm" type="number" class="num" value="60"></label>
       <button class="btn primary" id="ntmk">יצירה</button>
     </div>`);
+  async function saveShabbat(patch, undo){
+    const {data,error}=await sb.from('coach_clubs').update(patch).eq('id',S.club.id).select('shabbat_mode');
+    if(error||!data||!data.length){ undo&&undo(); return toast('לא נשמר'); }
+    Object.assign(S.club, patch); return true;
+  }
+  const shb=$('#shb'), shc=$('#shc');
+  if(shb) shb.onchange=async()=>{
+    const v=shb.checked;
+    if(await saveShabbat({shabbat_mode:v}, ()=>{shb.checked=!v;})) toast(v?'מצב שבת פעיל':'בוטל');
+  };
+  if(shc) shc.onchange=async()=>{
+    const name=shc.value.trim(), ll=cityCoords(name);
+    if(!ll){ return toast('עיר לא מוכרת — הזמנים נשארים לפי ' + (S.club?.city||'תל אביב')); }
+    // the coordinates are what the times are actually computed from
+    if(await saveShabbat({city:name, lat:ll[0], lng:ll[1]})) { toast('נשמר'); go('settings'); }
+  };
   $('#ntmk').onclick=async()=>{
     const name=$('#ntn').value.trim(); if(!name) return toast('חסר שם');
     const {data,error}=await sb.from('coach_teams').insert({club_id:S.club.id,name,age_profile:$('#ntap').value,
