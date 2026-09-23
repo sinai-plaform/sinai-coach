@@ -411,6 +411,6 @@ function shareSession(){
   const lines=[`אימון ${S.team.name} — ${fmtDate(S.session.date)}`, S.session.focus?`דגש: ${S.session.focus}`:'',
     ...S.sessionDrills.map((it,i)=>{const d=drillById(it.id)||{name:''};return `${i+1}. ${d.name} (${it.min}׳)`;}),
     `נוכחות: ${presentPlayers().length}/${S.players.length}`];
-  window.open('https://wa.me/?text='+encodeURIComponent(lines.filter(Boolean).join('\n')),'_blank');
+  waOpen('https://wa.me/?text='+encodeURIComponent(lines.filter(Boolean).join('\n')));
 }
 
