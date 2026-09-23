@@ -223,17 +223,18 @@ async function deliverInvite(gid, {silent}={}){
   const names={}; S.players.forEach(p=>names[p.id]=p.name.split(' ')[0]);
   const kids=(g.coach_guardian_players||[]).map(x=>names[x.player_id]).filter(Boolean).join(' ו');
   const {link,id}=await makeInvite(gid);
-  await sb.from('coach_invites').update({
-    sent_at:new Date().toISOString(), sent_count:1, channel:'whatsapp', delivery:'sent'}).eq('id',id);
   if(!silent){
     const to=g.phone.replace(/[^0-9]/g,'');
-    window.open(`https://wa.me/${to}?text=`+encodeURIComponent(inviteText(link,kids)),'_blank');
+    // nothing is recorded as sent unless WhatsApp actually opened
+    if(!await waOpen(`https://wa.me/${to}?text=`+encodeURIComponent(inviteText(link,kids)))) return null;
   }
+  await sb.from('coach_invites').update({
+    sent_at:new Date().toISOString(), sent_count:1, channel:'whatsapp', delivery:'sent'}).eq('id',id);
   return link;
 }
 async function sendTo(gid){
   try{
-    await deliverInvite(gid);
+    if(!await deliverInvite(gid)) return;
     const row=$('#i_'+gid);
     if(row){ const b=row.querySelector('button');
       if(b){ b.outerHTML='<span class="pill ok">נשלח</span>'; } row.style.opacity='.6'; }
@@ -258,7 +259,7 @@ async function inviteAll(mode){
 }
 
 /* ---------- group updates: free, through the coach's own WhatsApp groups ---------- */
-function waText(t){ window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank'); }
+const waText = t => waOpen('https://wa.me/?text='+encodeURIComponent(t));
 async function copyText(t, btn){
   try{ await navigator.clipboard.writeText(t); }
   catch(e){ const a=document.createElement('textarea'); a.value=t; document.body.appendChild(a);
@@ -312,7 +313,7 @@ VIEWS.broadcast = async function(){
 };
 async function bcSend(i, kind){
   const body = $('#bc'+i).value.trim(); if(!body) return;
-  waText(body);
+  if(!await waText(body)) return;
   await push('coach_messages',{club_id:S.club.id, team_id:S.team.id, kind, body,
     channel:'whatsapp_group', sent_at:new Date().toISOString(), by_user:S.user.id});
   toast('נרשם ביומן ההודעות');
