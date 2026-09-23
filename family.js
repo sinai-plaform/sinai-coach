@@ -129,6 +129,15 @@ async function famKid(id){
 
     ${attrHtml}
 
+    ${S.role==='parent'?`<div class="card" style="margin-top:14px" id="hdcard">
+      <h3>הצהרת בריאות</h3>
+      ${k.health_declared_at
+        ? `<p class="sm" style="margin-top:6px"><span class="pill ok">✓</span> נחתמה ב-${fmtDate(k.health_declared_at)}</p>
+           <p class="xs muted" style="margin-top:8px">${esc(HEALTH_TEXT)}</p>`
+        : `<p class="xs muted" style="margin:6px 0 10px">${esc(HEALTH_TEXT)}</p>
+           <button class="btn primary big" id="hdsign">אני מאשר/ת וחותם/ת</button>`}
+    </div>`:''}
+
     ${S.role==='parent'&&gradeOf(k)>=(FAM.club?.player_login_min_grade??3)?`
       <div class="card" style="margin-top:14px"><h3>כניסה של ${esc(k.name.split(' ')[0])}</h3>
         <div class="togrow"><div class="t"><b>לאפשר לילד להיכנס לאפליקציה</b>
@@ -140,6 +149,14 @@ async function famKid(id){
     <div class="card" style="margin-top:14px"><h3>הודעה למאמן</h3>
       <p class="xs muted" style="margin:4px 0 10px">היעדרות, פציעה, או כל דבר שכדאי שידע.</p>
       <button class="btn" onclick="famNotify('${k.id}')">שליחה בוואטסאפ</button></div>`;
+
+  const hd=$('#hdsign');
+  if(hd) hd.onclick=async()=>{
+    hd.disabled=true;
+    const {data,error}=await sb.rpc('coach_sign_health',{p_player:k.id});
+    if(error||!data){ hd.disabled=false; return toast(error?'לא נשמר: '+error.message:'לא נשמר'); }
+    k.health_declared_at=data; toast('נחתם'); famKid(k.id);
+  };
 
   const kl=$('#kidLogin');
   if(kl) kl.onchange=async()=>{
@@ -158,6 +175,6 @@ async function famKid(id){
 function famNotify(id){
   const k=FAM.kids.find(x=>x.id===id);
   const msg=`שלום, לגבי ${k.name}: `;
-  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+  waOpen('https://wa.me/?text='+encodeURIComponent(msg));
 }
 
