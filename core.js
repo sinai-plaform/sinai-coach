@@ -11,9 +11,11 @@ if(!window.supabase){
 }
 const sb = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true,autoRefreshToken:true}});
 const FN = SB_URL+'/functions/v1/coach-auth';
-async function fn(action, payload){
+async function fn(action, payload, withAuth){
   try{
-    const r = await fetch(FN,{method:'POST',headers:{'Content-Type':'application/json'},
+    const headers={'Content-Type':'application/json'};
+    if(withAuth){ const {data:{session}}=await sb.auth.getSession(); if(session) headers.Authorization='Bearer '+session.access_token; }
+    const r = await fetch(FN,{method:'POST',headers,
       body:JSON.stringify(Object.assign({action},payload||{}))});
     const j = await r.json().catch(()=>({error:'שגיאת רשת'}));
     return r.ok ? j : {error: j.error || ('שגיאה '+r.status)};
@@ -108,6 +110,7 @@ function svgDiag(d,cls){
     case 'shot':later.push(OP(it)+`<polyline points="${poly(it.pts)}" fill="none" stroke="#fff" stroke-width="1.5" marker-end="url(#aW)"/>`+CL(it));break;
     case 'p':later.push(`<circle cx="${it.x}" cy="${it.y}" r="3.3" fill="${TEAMC[it.s]||TEAMC.a}" stroke="#fff" stroke-width=".7"/>`+(it.n?`<text x="${it.x}" y="${it.y+1.2}" font-size="${String(it.n).length>1?2.4:3.2}" fill="#fff" text-anchor="middle" font-weight="700">${esc(it.n)}</text>`:(it.s==='co'?`<text x="${it.x}" y="${it.y+1.2}" font-size="3" fill="#fff" text-anchor="middle" font-weight="700">מ</text>`:'')));break;
     case 'ball':later.push(`<circle cx="${it.x}" cy="${it.y}" r="1.7" fill="#fff" stroke="#1E1E1E" stroke-width=".45"/><circle cx="${it.x}" cy="${it.y}" r=".6" fill="#1E1E1E"/>`);break;
+    case 'badge':later.push(`<circle cx="${it.x}" cy="${it.y}" r="2.6" fill="${it.hi?'#F0813F':'#18221C'}" stroke="#fff" stroke-width=".4"/><text x="${it.x}" y="${it.y+1.1}" font-size="3" fill="#fff" text-anchor="middle" font-weight="700">${esc(it.n)}</text>`);break;
     case 'txt':later.push(`<text x="${it.x}" y="${it.y}" font-size="3.4" fill="#fff" text-anchor="middle" paint-order="stroke" stroke="#0B2A18" stroke-width=".9" stroke-opacity=".7">${esc(it.s)}</text>`);break;
   }});
   return s+later.join('')+'</svg>';
@@ -288,44 +291,87 @@ addEventListener('popstate',e=>{
 /* ---------- auth screens ---------- */
 function renderLogin(err){
   $('#nav').classList.add('hide');
-  let mode='in';
+  let mode=LS('loginMode')||'in';     // in | up | parent | kid
+  let otpPhone=null;
+  const tabs=`<div class="chips" style="justify-content:center;margin-bottom:12px">
+      <button class="chip" data-m="in">מאמן</button><button class="chip" data-m="parent">הורה</button><button class="chip" data-m="kid">שחקן</button></div>`;
   const draw=()=>{
-    $('#app').innerHTML=`<div class="wrap" style="max-width:420px;padding-top:52px">
-    <div style="text-align:center;margin-bottom:24px">
+    const coach = mode==='in'||mode==='up';
+    $('#app').innerHTML=`<div class="wrap" style="max-width:420px;padding-top:44px">
+    <div style="text-align:center;margin-bottom:18px">
       <div style="font-size:44px">⚽</div>
       <h1 style="margin-top:8px">SINAI Coach</h1>
-      <p class="muted sm">${mode==='in'?'אימונים, נתוני שחקנים והורים — במקום אחד':'פתיחת חשבון מאמן חדש'}</p>
+      <p class="muted sm">${mode==='up'?'פתיחת חשבון מאמן חדש':mode==='parent'?'כניסת הורים — עם קוד לטלפון':mode==='kid'?'כניסת שחקן':'אימונים, נתוני שחקנים והורים — במקום אחד'}</p>
     </div>
+    ${tabs}
     <div class="card stack">
       <div id="err" class="alert hide"></div>
-      <label class="f">אימייל<input id="em" type="email" autocomplete="username" inputmode="email" autocapitalize="off"></label>
-      <label class="f">סיסמה<input id="pw" type="password" autocomplete="${mode==='in'?'current-password':'new-password'}"></label>
-      <button class="btn primary big" id="doBtn">${mode==='in'?'כניסה':'פתיחת חשבון'}</button>
-      <button class="btn ghost sm" id="swBtn">${mode==='in'?'אין לי חשבון — הרשמה':'← יש לי כבר חשבון'}</button>
-    </div>
-    <p class="xs muted" style="text-align:center;margin-top:16px">
-      הורה? הכניסה שלך היא דרך הקישור שהמאמן שולח בוואטסאפ — בלי סיסמה.</p>
-    </div>`;
+      ${coach?`
+        <label class="f">אימייל<input id="em" type="email" autocomplete="username" inputmode="email" autocapitalize="off"></label>
+        <label class="f">סיסמה<input id="pw" type="password" autocomplete="${mode==='in'?'current-password':'new-password'}"></label>
+        <button class="btn primary big" id="doBtn">${mode==='in'?'כניסה':'פתיחת חשבון'}</button>
+        <button class="btn ghost sm" id="swBtn">${mode==='in'?'אין לי חשבון — הרשמה':'← יש לי כבר חשבון'}</button>`
+      : mode==='parent' ? (!otpPhone ? `
+        <label class="f">מספר הטלפון שמסרת למאמן<input id="ph" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" placeholder="050-0000000"></label>
+        <button class="btn primary big" id="doBtn">שליחת קוד ב-SMS</button>
+        <p class="xs muted">אם קיבלת קישור מהמאמן בוואטסאפ — אפשר פשוט ללחוץ עליו.</p>`
+        : `<p class="sm">שלחנו קוד בן 6 ספרות ל-<b dir="ltr">${esc(otpPhone)}</b></p>
+        <label class="f">הקוד<input id="cd" inputmode="numeric" autocomplete="one-time-code" maxlength="8" dir="ltr" style="letter-spacing:6px;text-align:center;font-size:20px"></label>
+        <button class="btn primary big" id="doBtn">כניסה</button>
+        <button class="btn ghost sm" id="reBtn">מספר אחר / שליחה מחדש</button>`)
+      : `
+        <label class="f">שם משתמש<input id="un" autocapitalize="off" autocomplete="username" dir="ltr"></label>
+        <label class="f">סיסמה<input id="pw" type="password" autocomplete="current-password"></label>
+        <button class="btn primary big" id="doBtn">כניסה</button>
+        <p class="xs muted">את שם המשתמש והסיסמה פותח ההורה באפליקציה שלו.</p>`}
+    </div></div>`;
+    $$('[data-m]').forEach(b=>{ b.classList.toggle('on', b.dataset.m===mode || (b.dataset.m==='in'&&mode==='up'));
+      b.onclick=()=>{ mode=b.dataset.m; LS('loginMode',mode); err=null; otpPhone=null; draw(); }; });
     if(err) showErr(err);
-    $('#swBtn').onclick=()=>{ mode = mode==='in'?'up':'in'; err=null; draw(); };
+    const sw=$('#swBtn'); if(sw) sw.onclick=()=>{ mode = mode==='in'?'up':'in'; err=null; draw(); };
+    const re=$('#reBtn'); if(re) re.onclick=()=>{ otpPhone=null; draw(); };
     $('#doBtn').onclick=submit;
-    $('#pw').onkeydown=e=>{ if(e.key==='Enter') submit(); };
+    $$('#app input').forEach(i=>i.onkeydown=e=>{ if(e.key==='Enter') submit(); });
   };
   const showErr=m=>{ const e=$('#err'); e.textContent=m; e.classList.remove('hide'); };
-  const busy=(b,t)=>{ const x=$('#doBtn'); x.disabled=b; x.textContent=b?t:(mode==='in'?'כניסה':'פתיחת חשבון'); };
+  const busy=(b,t)=>{ const x=$('#doBtn'); x.disabled=b; if(b) x.textContent=t; };
   async function submit(){
-    const email=$('#em').value.trim(), password=$('#pw').value;
     $('#err').classList.add('hide');
+    if(mode==='parent'){
+      if(!otpPhone){
+        const ph=$('#ph').value.trim(); if(!ph) return showErr('צריך מספר טלפון');
+        busy(true,'שולח…');
+        const r=await fn('otp_send',{phone:ph});
+        if(r.error){ busy(false); draw(); return showErr(r.error); }
+        otpPhone=ph; return draw();
+      }
+      const code=$('#cd').value.trim(); if(code.length<4) return showErr('צריך את הקוד מה-SMS');
+      busy(true,'בודק…');
+      const r=await fn('otp_check',{phone:otpPhone,code});
+      if(r.error){ busy(false); $('#doBtn').textContent='כניסה'; return showErr(r.error); }
+      const s2=await useToken(r.token_hash); if(s2.error) return showErr(s2.error);
+      if(r.device) LS('dev', r.device);
+      return bootstrap();
+    }
+    if(mode==='kid'){
+      const un=$('#un').value.trim().toLowerCase(), pw=$('#pw').value;
+      if(!un||!pw) return showErr('צריך שם משתמש וסיסמה');
+      busy(true,'מתחבר…');
+      const {error}=await sb.auth.signInWithPassword({email:un+'@kid.sinai-coach.app',password:pw});
+      if(error){ busy(false); $('#doBtn').textContent='כניסה'; return showErr('שם משתמש או סיסמה שגויים'); }
+      return bootstrap();
+    }
+    const email=$('#em').value.trim(), password=$('#pw').value;
     if(!email) return showErr('צריך למלא אימייל');
     if(password.length<6) return showErr('הסיסמה צריכה להיות באורך 6 תווים לפחות');
     if(mode==='up'){
       busy(true,'פותח חשבון…');
       const r=await fn('signup',{email,password});
-      if(r.error){ busy(false); return showErr(r.error); }
+      if(r.error){ busy(false); $('#doBtn').textContent='פתיחת חשבון'; return showErr(r.error); }
     }
     busy(true,'מתחבר…');
     const {error}=await sb.auth.signInWithPassword({email,password});
-    if(error){ busy(false); return showErr(/Invalid login/i.test(error.message)?'אימייל או סיסמה שגויים':error.message); }
+    if(error){ busy(false); $('#doBtn').textContent=mode==='in'?'כניסה':'פתיחת חשבון'; return showErr(/Invalid login/i.test(error.message)?'אימייל או סיסמה שגויים':error.message); }
     bootstrap();
   }
   draw();

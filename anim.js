@@ -14,17 +14,32 @@ function pathAt(pts, f){
 }
 const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
 
-/* build the beats once; positions are resolved as the beats play */
+/* default step of every arrow (automatic order), so the editor can show it */
+function autoSteps(items){
+  const out={}; let step=0, hasBall=false, any=false;
+  items.forEach((it,i)=>{
+    if(!['pass','run','drib','shot'].includes(it.t) || !it.pts || it.pts.length<2) return;
+    if(it.t==='run'){ if(!any){ step=1; any=true; } }
+    else { if(!any){ step=1; any=true; } else if(hasBall){ step++; } hasBall=true; }
+    if(it.t!=='run' && out.__last!==step) hasBall=true;
+    out[i]=step;
+  });
+  delete out.__last; return out;
+}
+/* who moves along an arrow: ball, player or both */
+const MOVERS={ball:'הכדור',player:'השחקן',both:'שחקן עם כדור'};
+const defMover=t=> t==='pass'||t==='shot' ? 'ball' : t==='drib' ? 'both' : 'player';
+
+/* build the beats once; a coach-set step (it.step) beats the automatic order */
 function animPlan(diag){
   const items=JSON.parse(JSON.stringify((diag&&diag.items)||[]));
-  const arrows=items.map((it,i)=>({it,i})).filter(x=>['pass','run','drib','shot'].includes(x.it.t)&&x.it.pts&&x.it.pts.length>1);
-  const beats=[]; let cur=null;
-  arrows.forEach(a=>{
-    if(a.it.t==='run'){ if(!cur){cur={acts:[]};beats.push(cur);} cur.acts.push(a); }
-    else { if(cur && cur.acts.some(x=>x.it.t!=='run')){ cur={acts:[]}; beats.push(cur); } else if(!cur){ cur={acts:[]}; beats.push(cur); } cur.acts.push(a); }
-  });
+  const auto=autoSteps(items);
+  const byStep={};
+  Object.keys(auto).forEach(k=>{ const i=+k, it=items[i]; const st=it.step!=null?+it.step:auto[i];
+    (byStep[st]=byStep[st]||[]).push({it,i,mover:it.mover||defMover(it.t)}); });
+  const beats=Object.keys(byStep).map(Number).sort((a,b)=>a-b).map(k=>({step:k,acts:byStep[k]}));
   beats.forEach(b=>{ b.dur=Math.max(...b.acts.map(a=>{ const L=pathLen(a.it.pts);
-    const speed = a.it.t==='shot'?70 : a.it.t==='pass'?45 : a.it.t==='drib'?18 : 22;   // units per second
+    const speed = a.mover==='ball' ? (a.it.t==='shot'?70:45) : a.mover==='both' ? 18 : 22;   // units per second
     return Math.max(.7, Math.min(2.6, L/speed)); })); });
   return {items, beats, total: beats.reduce((s,b)=>s+b.dur+.35,0)+.9};
 }
@@ -48,10 +63,10 @@ function animFrame(plan, t){
       const p=ease(Math.min(1,Math.max(0,f)));
       const pos=pathAt(a.it.pts, p);
       const [sx,sy]=a.it.pts[0];
-      if(a.it.t==='pass'||a.it.t==='shot'){ const b=ballAt(sx,sy); b.x=pos[0]; b.y=pos[1]; }
+      if(a.mover==='ball'){ const bl=ballAt(sx,sy); bl.x=pos[0]; bl.y=pos[1]; }
       else { const who=nearest(sx,sy);
-        if(a.it.t==='drib'){ const b=ballAt(sx+1.6,sy+2.2); if(who){ who.x=pos[0]; who.y=pos[1]; } b.x=pos[0]+1.6; b.y=pos[1]+2.2; }
-        else if(who){ who.x=pos[0]; who.y=pos[1]; } }
+        if(who){ who.x=pos[0]; who.y=pos[1]; }
+        if(a.mover==='both'){ const bl=ballAt(sx+1.6,sy+2.2); bl.x=pos[0]+1.6; bl.y=pos[1]+2.2; } }
     });
   });
   return {items};

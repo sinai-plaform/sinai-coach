@@ -85,7 +85,9 @@ VIEWS.board = function(arg){
         <button class="btn sm" style="flex:1" id="bnum">מספרים: ${BOARD.numbers?'כן':'לא'}</button>
         <button class="btn sm danger" style="flex:1" id="bclear">נקה</button>
       </div>
-      <button class="btn big" style="margin-top:10px;width:100%" id="bplay">▶ הדגמה של התרגיל</button>
+      <div class="row" style="gap:8px;margin-top:10px">
+        <button class="btn big" style="flex:2" id="bplay">▶ הדגמה של התרגיל</button>
+        <button class="btn big" style="flex:1" id="bseq">🎬 סדר תנועות</button></div>
       <details class="card" style="margin-top:12px" id="bdet" open>
         <summary style="cursor:pointer;font-weight:500">פרטי התרגיל — שם, מהלך, דגשים והערות</summary>
         <div class="stack" style="margin-top:10px">${drillFieldsHtml(BOARD.meta || (d ? {...d, name: d.mine?d.name:(d.name+' — הגרסה שלי')} : null))}</div>
@@ -107,6 +109,7 @@ VIEWS.board = function(arg){
     BOARD.items = JSON.parse(BOARD.undo.pop()); BOARD.pend=null; bDraw(); };
   $('#bclear').onclick = ()=>{ if(!BOARD.items.length) return; bPush(); BOARD.items=[]; BOARD.pend=null; bDraw(); };
   $('#bnum').onclick = ()=>{ BOARD.numbers=!BOARD.numbers; $('#bnum').textContent='מספרים: '+(BOARD.numbers?'כן':'לא'); };
+  $('#bseq').onclick = seqEditor;
   $('#bsave').onclick = ()=>bSave(false);
   $('#bsaveadd').onclick = ()=>bSave(true);
   let stopAnim=null;
@@ -131,8 +134,42 @@ function bHint(){
 
 function bDraw(){
   const st=$('#bstage'); if(!st) return;
-  const show = BOARD.pend && BOARD.pend.ghost ? BOARD.items.concat([BOARD.pend.ghost]) : BOARD.items;
+  let show = BOARD.pend && BOARD.pend.ghost ? BOARD.items.concat([BOARD.pend.ghost]) : BOARD.items.slice();
+  // numbered badges show the order the demo will play in
+  const auto=autoSteps(BOARD.items);
+  Object.keys(auto).forEach(k=>{ const it=BOARD.items[+k], n=it.step!=null?it.step:auto[k];
+    const m=pathAt(it.pts,.5); show.push({t:'badge',x:m[0],y:m[1],n:String(n),hi:BOARD.hi===+k}); });
   st.innerHTML = svgDiag({items:show}, 'dg bpitch');
+}
+
+/* ---------- order of movements (what moves, and when) ---------- */
+function seqEditor(){
+  const draw=()=>{
+    const auto=autoSteps(BOARD.items);
+    const rows=Object.keys(auto).map(Number);
+    const TL={pass:'מסירה',run:'ריצה',drib:'כדרור',shot:'בעיטה'};
+    sheet(`<h2>סדר התנועות</h2>
+      <p class="xs muted" style="margin:4px 0 10px">כל חץ מקבל מספר שלב. חיצים עם אותו מספר זזים יחד. אפשר גם לקבוע מה זז לאורך החץ.</p>
+      ${rows.length?`<div class="stack">${rows.map(i=>{ const it=BOARD.items[i]; const stp=it.step!=null?it.step:auto[i]; const mv=it.mover||defMover(it.t);
+        return `<div class="prow" style="flex-wrap:wrap;gap:6px${BOARD.hi===i?';border-color:var(--accent)':''}" onclick="seqHi(${i})">
+          <div class="av" style="width:30px;height:30px">${stp}</div>
+          <div class="pname"><b class="sm">${TL[it.t]}</b><span class="xs muted">${it.step!=null?'נקבע ידנית':'אוטומטי'}</span></div>
+          <button class="btn sm" onclick="event.stopPropagation();seqStep(${i},-1)">−</button>
+          <button class="btn sm" onclick="event.stopPropagation();seqStep(${i},1)">+</button>
+          <select onclick="event.stopPropagation()" onchange="seqMover(${i},this.value)" style="width:auto;padding:6px">
+            ${Object.entries(MOVERS).map(([k,v])=>`<option value="${k}" ${k===mv?'selected':''}>${v}</option>`).join('')}</select>
+        </div>`;}).join('')}</div>
+        <div class="row" style="gap:8px;margin-top:12px">
+          <button class="btn" style="flex:1" onclick="seqReset()">חזרה לסדר אוטומטי</button>
+          <button class="btn primary" style="flex:1" onclick="closeSheet();BOARD.hi=null;bDraw();$('#bplay').click()">▶ נגן</button></div>`
+      :'<p class="muted sm">עדיין אין חיצים. ציירו מסירה, ריצה או כדרור.</p>'}`);
+  };
+  window.seqHi=i=>{ BOARD.hi=i; bDraw(); draw(); };
+  window.seqStep=(i,d)=>{ bPush(); const auto=autoSteps(BOARD.items); const it=BOARD.items[i];
+    it.step=Math.max(1,(it.step!=null?it.step:auto[i])+d); BOARD.hi=i; bDraw(); draw(); };
+  window.seqMover=(i,v)=>{ bPush(); const it=BOARD.items[i]; if(v===defMover(it.t)) delete it.mover; else it.mover=v; draw(); };
+  window.seqReset=()=>{ bPush(); BOARD.items.forEach(it=>{ delete it.step; delete it.mover; }); BOARD.hi=null; bDraw(); draw(); };
+  draw();
 }
 
 /* Handlers live on the container, not the <svg>: bDraw() replaces the svg on

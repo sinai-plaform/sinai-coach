@@ -138,13 +138,38 @@ async function famKid(id){
            <button class="btn primary big" id="hdsign">אני מאשר/ת וחותם/ת</button>`}
     </div>`:''}
 
+    ${S.role==='parent'?`<div class="card" style="margin-top:14px">
+      <h3>פרטי ${esc(k.name.split(' ')[0])}</h3>
+      <p class="xs muted" style="margin:4px 0 10px">מה שהמאמן צריך לדעת. רק המאמנים של הילד רואים את זה.</p>
+      <div class="stack">
+        <div class="grid2">
+          <label class="f">תאריך לידה<input id="kbd" type="date" value="${k.birth_date||''}"></label>
+          <label class="f">כיתה<select id="kgr"><option value="">—</option>${Object.entries(GRADES).concat([[8,'ח׳'],[9,'ט׳'],[10,'י׳'],[11,'י״א'],[12,'י״ב']]).map(([v,l])=>`<option value="${v}" ${String(k.grade)===String(v)?'selected':''}>${l}</option>`).join('')}</select></label>
+        </div>
+        <div class="grid2">
+          <label class="f">בית ספר<input id="ksc" value="${esc(k.school||'')}"></label>
+          <label class="f">מידת חולצה<select id="ksz">${['','6','8','10','12','14','16','XS','S','M','L','XL'].map(x=>`<option ${x===(k.shirt_size||'')?'selected':''}>${x}</option>`).join('')}</select></label>
+        </div>
+        <div class="grid2">
+          <label class="f">איש קשר נוסף לחירום<input id="ken" value="${esc(k.emergency_name||'')}" placeholder="למשל: אבא — יוסי"></label>
+          <label class="f">הטלפון שלו<input id="kep" type="tel" inputmode="tel" dir="ltr" value="${esc(k.emergency_phone||'')}"></label>
+        </div>
+        <label class="f">מי אוסף מהאימון<input id="kpk" value="${esc(k.pickup_note||'')}" placeholder="הולך לבד / סבתא / הסעה"></label>
+        <label class="f">משהו שחשוב שהמאמן יידע<textarea id="kcn" rows="2" placeholder="למשל: מרכיב משקפיים, צריך מים בכל הפסקה">${esc(k.coach_note||'')}</textarea></label>
+        <button class="btn primary" id="ksave">שמירת הפרטים</button>
+      </div></div>`:''}
+
     ${S.role==='parent'&&gradeOf(k)>=(FAM.club?.player_login_min_grade??3)?`
-      <div class="card" style="margin-top:14px"><h3>כניסה של ${esc(k.name.split(' ')[0])}</h3>
-        <div class="togrow"><div class="t"><b>לאפשר לילד להיכנס לאפליקציה</b>
-          <span>נפתח חשבון לילד עם קישור אישי שתעביר למכשיר שלו. אפשר לסגור בכל רגע.</span></div>
-          <label class="sw"><input type="checkbox" id="kidLogin" ${k.login_enabled?'checked':''}><i></i></label></div>
-        <div id="kidLink"></div>
-      </div>`:''}
+      <div class="card" style="margin-top:14px"><h3>חשבון ל${esc(k.name.split(' ')[0])}</h3>
+        <p class="xs muted" style="margin:4px 0 10px">${k.login_enabled&&k.username
+          ?`פתוח · שם המשתמש: <b dir="ltr">${esc(k.username)}</b>. אפשר להחליף סיסמה או לסגור.`
+          :'פותחים לילד שם משתמש וסיסמה, והוא נכנס בלשונית "שחקן". אפשר לסגור בכל רגע.'}</p>
+        <div class="stack">
+          <label class="f">שם משתמש (באנגלית)<input id="kun" dir="ltr" autocapitalize="off" value="${esc(k.username||'')}" placeholder="noam.c"></label>
+          <label class="f">סיסמה${k.username?' חדשה':''}<input id="kpw" type="text" dir="ltr" autocomplete="new-password" placeholder="6 תווים לפחות"></label>
+          <button class="btn primary" id="kopen">${k.login_enabled&&k.username?'עדכון':'פתיחת חשבון'}</button>
+          ${k.login_enabled?'<button class="btn danger" id="kclose">סגירת החשבון</button>':''}
+        </div></div>`:''}
 
     <div class="card" style="margin-top:14px"><h3>הודעה למאמן</h3>
       <p class="xs muted" style="margin:4px 0 10px">היעדרות, פציעה, או כל דבר שכדאי שידע.</p>
@@ -158,17 +183,40 @@ async function famKid(id){
     k.health_declared_at=data; toast('נחתם'); famKid(k.id);
   };
 
-  const kl=$('#kidLogin');
-  if(kl) kl.onchange=async()=>{
-    const v=kl.checked;
-    // the server decides; a silent no-op must never look like a save
-    const {data,error}=await sb.rpc('coach_set_player_login',{p_player:k.id,p_on:v});
-    if(error || data!==v){ kl.checked=!v; return toast(error?'לא נשמר: '+error.message:'לא נשמר'); }
-    k.login_enabled=v;
-    $('#kidLink').innerHTML = v
-      ? `<p class="xs muted" style="margin-top:10px">בקש מהמאמן קישור כניסה עבור ${esc(k.name.split(' ')[0])}.</p>`
-      : '';
-    toast(v?'נפתח':'נסגר');
+  const ks=$('#ksave');
+  if(ks) ks.onclick=async()=>{
+    const p={birth_date:$('#kbd').value||'',grade:$('#kgr').value,school:$('#ksc').value.trim(),shirt_size:$('#ksz').value,
+      emergency_name:$('#ken').value.trim(),emergency_phone:$('#kep').value.trim(),pickup_note:$('#kpk').value.trim(),coach_note:$('#kcn').value.trim()};
+    ks.disabled=true;
+    const {error}=await sb.rpc('coach_guardian_update_player',{p_player:k.id,p});
+    ks.disabled=false;
+    if(error) return toast('לא נשמר: '+error.message);
+    Object.assign(k,p,{birth_date:p.birth_date||k.birth_date,grade:p.grade===''?k.grade:+p.grade}); toast('נשמר');
+  };
+  const ko=$('#kopen');
+  if(ko) ko.onclick=async()=>{
+    const username=$('#kun').value.trim().toLowerCase(), password=$('#kpw').value;
+    if(!/^[a-z0-9._]{3,20}$/.test(username)) return toast('שם משתמש: 3–20 אותיות באנגלית או ספרות');
+    if(password.length<6) return toast('סיסמה של 6 תווים לפחות');
+    ko.disabled=true; ko.textContent='שומר…';
+    const r=await fn('child_set',{player_id:k.id,username,password},true);
+    ko.disabled=false;
+    if(r.error){ ko.textContent='נסו שוב'; return toast(r.error); }
+    k.username=username; k.login_enabled=true;
+    sheet(`<h2>החשבון של ${esc(k.name.split(' ')[0])} מוכן</h2>
+      <p class="sm" style="margin:8px 0">נכנסים באפליקציה ← לשונית "שחקן":</p>
+      <div class="card"><p>שם משתמש: <b dir="ltr">${esc(username)}</b></p><p>סיסמה: <b dir="ltr">${esc(password)}</b></p></div>
+      <button class="btn primary big" style="margin-top:12px" id="kcopy">העתקה לשליחה לילד</button>`);
+    $('#kcopy').onclick=()=>{ const t=`כניסה ל-SINAI Coach: ${location.origin+location.pathname}\nלשונית "שחקן"\nשם משתמש: ${username}\nסיסמה: ${password}`;
+      (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('הועתק')).catch(()=>toast(t)); };
+    famKid(k.id);
+  };
+  const kc=$('#kclose');
+  if(kc) kc.onclick=async()=>{
+    if(!confirm('לסגור את החשבון של הילד?')) return;
+    const r=await fn('child_close',{player_id:k.id},true);
+    if(r.error) return toast(r.error);
+    k.login_enabled=false; toast('נסגר'); famKid(k.id);
   };
 }
 

@@ -20,12 +20,25 @@ async function sha256hex(s){
 const randTok=()=>[...crypto.getRandomValues(new Uint8Array(32))]
   .map(x=>x.toString(16).padStart(2,'0')).join('');
 
+/* 12/3/2016 · 12.03.16 · 2016-03-12 · an Excel serial number */
+function parseBirth(v){
+  v=String(v).trim(); let m;
+  if((m=v.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/))){ let y=+m[3]; if(y<100) y+= y>40?1900:2000;
+    const d=+m[1], mo=+m[2]; if(mo<1||mo>12||d<1||d>31) return null; return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+  if((m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  if(/^\d{5}$/.test(v)){ const n=+v; if(n>30000&&n<50000){ const d=new Date(Date.UTC(1899,11,30)+n*864e5); return d.toISOString().slice(0,10); } }
+  return null;
+}
 function parseRoster(text){
   const rows=[];
   for(const line of text.split(/\r?\n/)){
     const raw=line.trim(); if(!raw) continue;
-    const parts=raw.split(/[\t,;|]+/).map(x=>x.trim()).filter(Boolean);
+    let parts=raw.split(/[\t,;|]+/).map(x=>x.trim()).filter(Boolean);
     if(!parts.length) continue;
+    // a header row from a spreadsheet
+    if(parts.some(p=>/^(שם|טלפון|תאריך|name|phone)/i.test(p)) && !/[0-9]{7,}/.test(raw)) continue;
+    let birth=null;
+    parts=parts.filter(p=>{ const b=parseBirth(p); if(b&&!birth){ birth=b; return false; } return true; });
     let phone=null, pi=-1;
     parts.forEach((p,i)=>{ const digits=p.replace(/[^0-9]/g,'');
       if(phone===null && digits.length>=8 && digits.length<=15 && /^[0-9+\-(). ]+$/.test(p)){ phone=normPhone(p); pi=i; } });
@@ -34,7 +47,7 @@ function parseRoster(text){
     const player=(names[0]||'').trim();
     const parent=(names[1]||'').trim();
     if(!player && !phone) continue;
-    rows.push({player,parent,phone,raw});
+    rows.push({player,parent,phone,birth,raw});
   }
   return rows;
 }
@@ -45,11 +58,25 @@ VIEWS.roster = function(){
     <div class="card stack">
       <p class="sm">הדבק את הרשימה מהמתנ״ס — שורה לכל שחקן.<br>
       <span class="xs muted">שם השחקן, טלפון ההורה, ושם ההורה אם יש. מופרד בפסיק או טאב (הדבקה מאקסל עובדת).</span></p>
-      <textarea id="rtext" rows="9" placeholder="דניאל כהן, 050-1234567, רונית כהן&#10;יואב לוי, 0521234567"></textarea>
+      <div class="grid2">
+        <label class="btn" style="cursor:pointer">📄 קובץ — אקסל / PDF / תמונה
+          <input id="rfile" type="file" accept=".xlsx,.xls,.csv,.pdf,image/*" style="display:none"></label>
+        <button class="btn" id="rgs">🟩 Google Sheets</button>
+      </div>
+      <p class="xs muted" id="rstat"></p>
+      <textarea id="rtext" rows="9" placeholder="דניאל כהן, 050-1234567, רונית כהן, 12/03/2016&#10;יואב לוי, 0521234567"></textarea>
       <button class="btn primary" id="rprev">בדיקת הרשימה</button>
     </div>
     <div id="rout"></div>`);
 
+  $('#rfile').onchange=e=>{ const f=e.target.files[0]; if(f) readRosterFile(f); e.target.value=''; };
+  $('#rgs').onclick=()=>{
+    sheet(`<h2>ייבוא מ-Google Sheets</h2>
+      <p class="xs muted" style="margin:4px 0 10px">בגיליון: שיתוף ← "כל מי שיש לו את הקישור" ← צופה. ואז מדביקים כאן את הקישור.</p>
+      <input id="gsu" dir="ltr" placeholder="https://docs.google.com/spreadsheets/d/…">
+      <button class="btn primary big" style="margin-top:10px" id="gsgo">טעינה</button>`);
+    $('#gsgo').onclick=async()=>{ const u=$('#gsu').value.trim(); closeSheet(); await readGoogleSheet(u); };
+  };
   $('#rprev').onclick=()=>{
     const rows=parseRoster($('#rtext').value);
     if(!rows.length) return toast('לא זוהו שורות');
@@ -64,9 +91,9 @@ VIEWS.roster = function(){
         <span class="xs">${bad.slice(0,4).map(b=>esc(b.raw)).join(' · ')}</span></div>`:''}
       ${dup.length?`<div class="card" style="margin-bottom:10px"><p class="sm">
         יש מספרים שחוזרים יותר מפעם אחת — הילדים האלה זוהו כאחים ויחוברו לאותו הורה. זה תקין.</p></div>`:''}
-      <div class="scroll-x"><table class="tbl"><tr><th>שחקן</th><th>הורה</th><th>טלפון</th></tr>
+      <div class="scroll-x"><table class="tbl"><tr><th>שחקן</th><th>הורה</th><th>טלפון</th><th>לידה</th></tr>
         ${okRows.map(r=>`<tr><td>${esc(r.player)}</td><td>${esc(r.parent||'—')}</td>
-          <td class="num" dir="ltr">${showPhone(r.phone)}</td></tr>`).join('')}</table></div>
+          <td class="num" dir="ltr">${showPhone(r.phone)}</td><td class="num">${r.birth?fmtDate(r.birth):'—'}</td></tr>`).join('')}</table></div>
       <button class="btn primary big" style="margin-top:14px" id="rgo">ייבוא ${okRows.length===1?'שחקן אחד':okRows.length+' שחקנים'}</button>`;
 
     $('#rgo').onclick=async()=>{
@@ -77,6 +104,64 @@ VIEWS.roster = function(){
   };
 };
 
+/* ---------- reading lists from files ---------- */
+const loadScript=src=>new Promise((ok,bad)=>{ if(document.querySelector(`script[src="${src}"]`)) return ok();
+  const s=document.createElement('script'); s.src=src; s.onload=ok; s.onerror=()=>bad(new Error('טעינה נכשלה')); document.head.appendChild(s); });
+function rosterStatus(t){ const e=$('#rstat'); if(e) e.textContent=t; }
+function putRosterText(lines, how){
+  const ta=$('#rtext'); if(!ta) return;
+  ta.value=lines.map(l=>l.trim()).filter(Boolean).join('\n');
+  rosterStatus(`${how}: נקראו ${ta.value.split('\n').length} שורות. בדקו ותקנו אם צריך, ואז "בדיקת הרשימה".`);
+  $('#rprev').click();
+}
+async function readRosterFile(f){
+  const n=f.name.toLowerCase();
+  try{
+    if(/\.(xlsx|xls|csv)$/.test(n)){
+      rosterStatus('קורא את הגיליון…');
+      await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+      const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,dateNF:'dd/mm/yyyy'});
+      return putRosterText(rows.map(r=>r.filter(c=>c!=null&&String(c).trim()!=='').join('\t')),'אקסל');
+    }
+    if(n.endsWith('.pdf')){
+      rosterStatus('קורא את ה-PDF…');
+      await loadScript('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js');
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+      const pdf=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise; const out=[];
+      for(let i=1;i<=pdf.numPages;i++){
+        const tc=await (await pdf.getPage(i)).getTextContent(); const byY={};
+        tc.items.forEach(it=>{ if(!it.str.trim()) return; const y=Math.round(it.transform[5]/3);
+          (byY[y]=byY[y]||[]).push({x:it.transform[4],s:it.str.trim()}); });
+        Object.keys(byY).map(Number).sort((a,b)=>b-a).forEach(y=>out.push(byY[y].sort((a,b)=>b.x-a.x).map(c=>c.s).join('\t')));
+      }
+      if(!out.length) throw new Error('ב-PDF אין טקסט (כנראה סריקה) — צלמו אותו ושלחו כתמונה');
+      return putRosterText(out,'PDF');
+    }
+    if(f.type.startsWith('image/')){
+      rosterStatus('מזהה טקסט מהתמונה… (בפעם הראשונה זה לוקח כחצי דקה)');
+      await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+      const {data}=await Tesseract.recognize(f,'heb+eng',{logger:m=>{ if(m.status==='recognizing text') rosterStatus('מזהה טקסט… '+Math.round(m.progress*100)+'%'); }});
+      return putRosterText(data.text.split('\n'),'תמונה');
+    }
+    toast('סוג קובץ לא נתמך');
+  }catch(e){ rosterStatus(''); toast('שגיאה: '+(e.message||e)); }
+}
+async function readGoogleSheet(u){
+  const m=u.match(/\/d\/([a-zA-Z0-9_-]+)/); if(!m) return toast('זה לא נראה כמו קישור לגיליון');
+  const gid=(u.match(/[#&?]gid=(\d+)/)||[])[1]||'0';
+  rosterStatus('טוען מ-Google Sheets…');
+  try{
+    const r=await fetch(`https://docs.google.com/spreadsheets/d/${m[1]}/gviz/tq?tqx=out:csv&gid=${gid}`);
+    if(!r.ok) throw new Error('הגיליון לא פתוח לשיתוף בקישור');
+    const csv=await r.text();
+    await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+    const wb=XLSX.read(csv,{type:'string',raw:true});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false});
+    putRosterText(rows.map(r=>r.filter(c=>c!=null&&String(c).trim()!=='').join('\t')),'Google Sheets');
+  }catch(e){ rosterStatus(''); toast('לא נטען: '+(e.message||e)); }
+}
+
 async function importRoster(rows){
   const clubId=S.club.id;
   // existing players by name, so a re-import does not duplicate
@@ -86,7 +171,7 @@ async function importRoster(rows){
   const newOnes=rows.filter(r=>!byName[r.player]);
   if(newOnes.length){
     const {data,error}=await sb.from('coach_players').insert(
-      newOnes.map(r=>({club_id:clubId,name:r.player,parent_name:r.parent||null,parent_phone:r.phone}))
+      newOnes.map(r=>({club_id:clubId,name:r.player,parent_name:r.parent||null,parent_phone:r.phone,birth_date:r.birth||null}))
     ).select('id,name');
     if(error) throw error;
     (data||[]).forEach(p=>byName[p.name.trim()]=p.id);

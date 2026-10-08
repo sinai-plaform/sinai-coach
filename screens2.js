@@ -289,7 +289,7 @@ VIEWS.player = async function(pid){
   const overall=vals.length?(vals.reduce((x,y)=>x+y,0)/vals.length).toFixed(1):'—';
   const present=(att||[]).filter(a=>a.present==='yes').length, tot=(att||[]).length;
   const grps={}; attrs.forEach(a=>(grps[a.grp]=grps[a.grp]||[]).push(a));
-  const showNum = S.team?.age_profile!=='a';
+  const showNum = true;   // the coach sees numbers at every age; children see trends only
   const bar=(v)=>{const pct=Math.max(4,Math.min(100,(v/20)*100));const col=v>=15?'var(--ok)':v>=10?'var(--warn)':'var(--bad)';return `<div class="bar"><i style="width:${pct}%;background:${col}"></i></div>`;};
   const trIcon=t=>t==null?'':t>=1?'<span style="color:var(--ok)">▲</span>':t<=-1?'<span style="color:var(--bad)">▼</span>':'<span class="muted">—</span>';
 
@@ -307,8 +307,18 @@ VIEWS.player = async function(pid){
         <span class="pill">נוכחות ${tot?Math.round(present/tot*100):0}%</span>
         <span class="pill">${list.length} תצפיות</span>
         ${p.status!=='active'?`<span class="pill warn">${({injured:'פצוע',sick:'חולה',away:'חופש'})[p.status]}</span>`:''}
+        ${p.username?`<span class="pill info">כניסה: ${esc(p.username)}</span>`:''}
       </div>
     </div>
+    ${(p.school||p.emergency_phone||p.pickup_note||p.coach_note||p.shirt_size)?`<div class="card" style="margin-top:10px">
+      <h3>מההורה</h3>
+      <div class="stack sm" style="margin-top:6px;gap:4px">
+        ${p.school?`<div>🏫 ${esc(p.school)}${p.grade!=null?' · כיתה '+esc(GRADES[p.grade]||p.grade):''}</div>`:''}
+        ${p.shirt_size?`<div>👕 מידה ${esc(p.shirt_size)}</div>`:''}
+        ${p.emergency_phone?`<div>🆘 ${esc(p.emergency_name||'איש קשר')} · <a href="tel:${esc(p.emergency_phone)}" dir="ltr">${esc(p.emergency_phone)}</a></div>`:''}
+        ${p.pickup_note?`<div>🚗 ${esc(p.pickup_note)}</div>`:''}
+        ${p.coach_note?`<div class="alert ok">📝 ${esc(p.coach_note)}</div>`:''}
+      </div>${p.details_updated_at?`<p class="xs muted" style="margin-top:6px">עודכן ${fmtDate(p.details_updated_at)}</p>`:''}</div>`:''}
 
     ${vals.length?`<div class="card" style="margin-top:10px">${radar(attrs,sc)}</div>`:''}
 
