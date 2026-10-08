@@ -8,14 +8,17 @@ VIEWS.home = async function(){
     `<button class="iconbtn" id="tsw">⇄</button>`);
   $('#tsw').onclick=teamSwitcher;
 
-  const [{data:sessions},{data:lastAtt}] = await Promise.all([
-    sb.from('coach_sessions').select('*').eq('team_id',t.id).order('date',{ascending:false}).limit(8),
+  const [{data:upcoming},{data:recent},{data:lastAtt}] = await Promise.all([
+    sb.from('coach_sessions').select('*').eq('team_id',t.id).in('status',['planned','live']).gte('date',new Date(Date.now()-864e5*3).toISOString().slice(0,10)).order('date').order('start_time').limit(4),
+    sb.from('coach_sessions').select('*').eq('team_id',t.id).eq('status','done').order('date',{ascending:false}).limit(5),
     sb.from('coach_attendance').select('player_id,present,session_id,coach_sessions!inner(team_id,date)')
       .eq('coach_sessions.team_id',t.id).order('session_id',{ascending:false}).limit(400)
   ]);
-  const ss=sessions||[];
-  const live=ss.find(x=>x.status==='live');
-  const planned=ss.find(x=>x.status==='planned');
+  const up=upcoming||[];
+  const live=up.find(x=>x.status==='live');
+  const todays=up.find(x=>x.status==='planned'&&x.date<=today());
+  const next=up.find(x=>x.status==='planned'&&x.date>today());
+  const ss=recent||[];
   // absence streaks
   const byP={}; (lastAtt||[]).forEach(a=>{(byP[a.player_id]=byP[a.player_id]||[]).push(a);});
   const risk=S.players.filter(p=>{const a=(byP[p.id]||[]).slice(0,2);return a.length===2&&a.every(x=>x.present==='no');});
@@ -25,12 +28,17 @@ VIEWS.home = async function(){
   $('#hm').innerHTML=`
     <div class="card">
       <div class="spread"><div><h2>${esc(t.name)}</h2>
-        <p class="muted sm">${({a:'גן–ב׳',b:'ג׳–ד׳',c:'ה׳–ז׳'})[t.age_profile]} · ${t.session_minutes} דק׳ · ${S.players.length} שחקנים${t.league_mode?' · ליגה':''}</p></div>
+        <p class="muted sm">${AGES[t.age_profile]||''} · ${t.session_minutes} דק׳ · ${S.players.length} שחקנים${t.league_mode?' · ליגה':''}</p></div>
         <button class="btn sm" onclick="go('teamedit')">הגדרות</button></div>
       <div class="sep"></div>
       ${live?`<button class="btn primary big" onclick="openSession('${live.id}')">המשך אימון פעיל</button>`
-        :planned?`<button class="btn primary big" onclick="openSession('${planned.id}')">התחל אימון — ${esc(planned.focus||fmtDate(planned.date))}</button>`
-        :`<button class="btn primary big" onclick="go('plan')">בניית אימון</button>`}
+        :todays?`<button class="btn primary big" onclick="openSession('${todays.id}')">התחל את אימון היום — ${esc(todays.focus||todays.theme||'')}</button>
+           <button class="btn ghost sm" style="width:100%;margin-top:6px" onclick="go('plan',{session:'${todays.id}'})">צפייה ועריכה לפני האימון</button>`
+        :`<button class="btn primary big" onclick="go('program')">תוכנית האימונים</button>`}
+      ${next?`<div class="prow" style="margin-top:8px" onclick="go('plan',{session:'${next.id}'})"><div class="av">📅</div>
+        <div class="pname"><b>האימון הבא: ${esc(dayLabel(next.date))}${next.start_time?' · '+String(next.start_time).slice(0,5):''}</b>
+        <span class="xs muted">${esc(next.focus||next.theme||'')}</span></div><span class="pill info">פתח</span></div>`
+        :(!todays&&!live?`<p class="xs muted" style="margin-top:8px;text-align:center">אין אימונים מתוכננים. <a href="#" onclick="go('program');return false">לבנות תוכנית</a></p>`:'')}
       <div class="grid2" style="margin-top:8px">
         <button class="btn" onclick="go('match')">מצב משחק</button>
         <button class="btn" onclick="go('broadcast')">עדכון להורים</button>
@@ -138,59 +146,162 @@ function importSheet(){
   };
 }
 
-/* ---------- PLAN (session builder) ---------- */
+/* ---------- PLAN (session editor) ----------
+   PLAN is either a draft for a new session, or a planned session from the
+   program (PLAN.sessionId). A planned session saves itself as you edit it. */
 let PLAN = LS('plan')||{focus:'',items:[]};
+if(!PLAN.items) PLAN.items=[];
 const planMin=()=>PLAN.items.reduce((s,i)=>s+(+i.min||0),0);
-VIEWS.plan = function(){
+const WD=['א׳','ב׳','ג׳','ד׳','ה׳','ו׳','ש׳'];
+const dayLabel=d=>{const x=new Date(d+'T12:00:00');return `יום ${WD[x.getDay()]} · ${x.getDate()}.${x.getMonth()+1}`;};
+let PLAN_T=null;
+function planChanged(){
+  LS('plan',PLAN);
+  if(!PLAN.sessionId) return;
+  clearTimeout(PLAN_T); PLAN_T=setTimeout(savePlanToSession,700);
+}
+async function savePlanToSession(){
+  if(!PLAN.sessionId) return;
+  const sid=PLAN.sessionId;
+  const up=await sb.from('coach_sessions').update({focus:PLAN.focus||null,date:PLAN.date||today(),
+    planned_minutes:planMin(),start_time:PLAN.time||null}).eq('id',sid);
+  if(up.error) return toast('לא נשמר: '+up.error.message);
+  await sb.from('coach_session_drills').delete().eq('session_id',sid);
+  if(PLAN.items.length) await sb.from('coach_session_drills').insert(PLAN.items.map((it,i)=>
+    ({session_id:sid,drill_id:it.id,ord:i,minutes:+it.min||1,notes:it.notes||null})));
+  const s=$('#psaved'); if(s){ s.textContent='נשמר ✓'; setTimeout(()=>{ if($('#psaved')) $('#psaved').textContent=''; },1500); }
+}
+async function loadPlanSession(id){
+  const [{data:s},{data:sd}]=await Promise.all([
+    sb.from('coach_sessions').select('*').eq('id',id).single(),
+    sb.from('coach_session_drills').select('*').eq('session_id',id).order('ord')]);
+  if(!s) return false;
+  PLAN={sessionId:id,status:s.status,date:s.date,time:s.start_time?String(s.start_time).slice(0,5):'',
+    focus:s.focus||'',theme:s.theme||'',phase:s.phase||'',week:s.week_no,
+    items:(sd||[]).map(x=>({id:x.drill_id,min:x.minutes,notes:x.notes||''}))};
+  LS('plan',PLAN); return true;
+}
+VIEWS.plan = async function(arg){
+  if(arg && arg.session && PLAN.sessionId!==arg.session){
+    screen('אימון', '<div class="empty">טוען…</div>');
+    if(!await loadPlanSession(arg.session)) return go('program');
+  }
+  if(arg && arg.fresh && PLAN.sessionId){ PLAN={focus:'',items:[],date:today()}; LS('plan',PLAN); }
   const target=S.team?S.team.session_minutes:60, t=planMin();
-  screen('בניית אימון', `
+  const bound=!!PLAN.sessionId, done=PLAN.status==='done';
+  screen(bound?'אימון מתוכנן':'אימון חדש', `
     <div class="card stack">
-      <label class="f">דגש האימון<input id="fo" value="${esc(PLAN.focus)}" placeholder="מסירות · לחץ · סיומות"></label>
+      ${PLAN.theme?`<div class="row wrap" style="gap:6px"><span class="pill info">${esc(PLAN.theme)}</span>
+        ${PLAN.week?`<span class="pill">שבוע ${PLAN.week}</span>`:''}${PLAN.phase?`<span class="pill">${esc(PLAN.phase)}</span>`:''}</div>`:''}
+      <div class="grid2">
+        <label class="f">תאריך<input id="pdt" type="date" value="${PLAN.date||today()}" ${done?'disabled':''}></label>
+        <label class="f">שעה<input id="ptm" type="time" value="${PLAN.time||''}" ${done?'disabled':''}></label>
+      </div>
+      <label class="f">דגש האימון<input id="fo" value="${esc(PLAN.focus)}" placeholder="מסירות · לחץ · סיומות" ${done?'disabled':''}></label>
       <div class="spread"><span class="sm muted">סה"כ <b class="num">${t}</b> מתוך <b class="num">${target}</b> דק׳</span>
         <span class="pill ${t>target?'bad':t===target?'ok':''}">${t>target?'חריגה '+(t-target)+'׳':'נשארו '+(target-t)+'׳'}</span></div>
       <div class="timer" style="padding:0;border:0"><div class="bar"><i style="width:${Math.min(100,t/target*100)}%" class="${t>target?'over':''}"></i></div></div>
-      <div class="chips"><span class="xs muted" style="align-self:center">תבניות:</span>
-        ${Object.entries(TEMPLATES).map(([k,v])=>`<button class="chip" onclick="loadTpl('${k}')">${esc(v.label)}</button>`).join('')}</div>
+      ${done?'':`<div class="chips"><span class="xs muted" style="align-self:center">תבניות:</span>
+        ${Object.entries(TEMPLATES).map(([k,v])=>`<button class="chip" onclick="loadTpl('${k}')">${esc(v.label)}</button>`).join('')}</div>`}
     </div>
-    <div class="hd"><h2>התרגילים</h2><button class="btn sm" onclick="go('library')">+ מהספרייה</button></div>
+    <div class="hd"><h2>התרגילים</h2>${done?'':'<button class="btn sm" onclick="go(\'library\')">+ מהספרייה</button>'}</div>
     <div class="stack" id="plist"></div>
-    <button class="btn primary big" style="margin-top:14px" id="startBtn" ${PLAN.items.length?'':'disabled'}>שמור והתחל אימון</button>
-    <button class="btn ghost sm" style="margin-top:8px;width:100%" onclick="PLAN={focus:'',items:[]};LS('plan',PLAN);go('plan')">נקה</button>`);
-  $('#fo').oninput=e=>{PLAN.focus=e.target.value;LS('plan',PLAN);};
+    <p class="xs muted" id="psaved" style="text-align:center;min-height:16px;margin-top:6px"></p>
+    ${done?`<button class="btn primary big" onclick="openSession('${PLAN.sessionId}')">סיכום האימון</button>`
+    : bound?`<button class="btn primary big" id="startBtn" ${PLAN.items.length?'':'disabled'}>התחל את האימון הזה</button>
+       <div class="row" style="gap:8px;margin-top:8px">
+         <button class="btn ghost" style="flex:1" onclick="go('program')">לתוכנית</button>
+         <button class="btn danger" style="flex:1" onclick="delPlannedSession()">מחיקת האימון</button></div>`
+    : `<button class="btn primary big" id="startBtn" ${PLAN.items.length?'':'disabled'}>התחל עכשיו</button>
+       <button class="btn big" style="margin-top:8px;width:100%" id="saveLater" ${PLAN.items.length?'':'disabled'}>שמירה לתאריך שנבחר</button>
+       <button class="btn ghost sm" style="margin-top:8px;width:100%" onclick="PLAN={focus:'',items:[],date:today()};LS('plan',PLAN);go('plan')">נקה</button>`}`);
+  if(!done){
+    $('#fo').oninput=e=>{PLAN.focus=e.target.value;planChanged();};
+    $('#pdt').onchange=e=>{PLAN.date=e.target.value;planChanged();};
+    $('#ptm').onchange=e=>{PLAN.time=e.target.value;planChanged();};
+  }
   renderPlanList();
-  $('#startBtn').onclick=startSession;
+  const sb_=$('#startBtn'); if(sb_) sb_.onclick=startSession;
+  const sl=$('#saveLater'); if(sl) sl.onclick=()=>saveSessionForLater();
 };
 function renderPlanList(){
   const el=$('#plist'); if(!el) return;
+  const done=PLAN.status==='done';
   el.innerHTML = PLAN.items.length? PLAN.items.map((it,i)=>{
     const d=drillById(it.id)||{name:'תרגיל',cat:'tech'};
-    return `<div class="prow"><div class="av">${i+1}</div>
-      <div class="pname"><b>${esc(d.name)}</b><span class="xs muted">${esc(CATS[d.cat]?.short||'')} · ${esc(d.src||'')}</span></div>
-      <input type="number" class="num" style="width:58px;padding:5px;text-align:center" value="${it.min}" onchange="setMin(${i},this.value)">
+    return `<div class="prow" style="flex-wrap:wrap"><div class="av">${i+1}</div>
+      <div class="pname" onclick="showDrill('${it.id}',${i})" style="cursor:pointer"><b>${esc(d.name)}</b>
+        <span class="xs muted">${esc(CATS[d.cat]?.short||'')}${it.notes?' · 📝 '+esc(it.notes.slice(0,60)):''}</span></div>
+      ${done?`<span class="pill">${it.min}׳</span>`:`
+      <input type="number" class="num" style="width:54px;padding:5px;text-align:center" value="${it.min}" onchange="setMin(${i},this.value)">
+      <button class="btn sm ghost" onclick="noteItem(${i})" title="הערות">📝</button>
+      <button class="btn sm ghost" onclick="swapItem(${i})" title="החלפה">⇄</button>
       <button class="btn sm ghost" onclick="movePlan(${i},-1)">↑</button>
-      <button class="btn sm ghost" onclick="movePlan(${i},1)">↓</button>
-      <button class="btn sm ghost" onclick="delPlan(${i})">✕</button></div>`;
+      <button class="btn sm ghost" onclick="delPlan(${i})">✕</button>`}</div>`;
   }).join('') : '<p class="muted sm">עוד אין תרגילים — הוסיפו מהספרייה או טענו תבנית.</p>';
 }
-function setMin(i,v){PLAN.items[i].min=Math.max(1,+v||1);LS('plan',PLAN);go('plan');}
-function movePlan(i,d){const j=i+d;if(j<0||j>=PLAN.items.length)return;[PLAN.items[i],PLAN.items[j]]=[PLAN.items[j],PLAN.items[i]];LS('plan',PLAN);go('plan');}
-function delPlan(i){PLAN.items.splice(i,1);LS('plan',PLAN);go('plan');}
-function loadTpl(k){const t=TEMPLATES[k];PLAN.items=t.items.map(([id,min])=>({id,min}));PLAN.focus=PLAN.focus||t.label;LS('plan',PLAN);go('plan');toast('התבנית נטענה');}
-function addToPlan(id,min){const d=drillById(id);PLAN.items.push({id,min:min||d.min});LS('plan',PLAN);toast('נוסף לאימון');}
+function setMin(i,v){PLAN.items[i].min=Math.max(1,+v||1);planChanged();go('plan');}
+function movePlan(i,d){const j=i+d;if(j<0||j>=PLAN.items.length)return;[PLAN.items[i],PLAN.items[j]]=[PLAN.items[j],PLAN.items[i]];planChanged();go('plan');}
+function delPlan(i){PLAN.items.splice(i,1);planChanged();go('plan');}
+function loadTpl(k){const t=TEMPLATES[k];PLAN.items=t.items.map(([id,min])=>({id,min}));PLAN.focus=PLAN.focus||t.label;planChanged();go('plan');toast('התבנית נטענה');}
+function addToPlan(id,min){const d=drillById(id);PLAN.items.push({id,min:min||d.min});planChanged();
+  toast(PLAN.sessionId?'נוסף לאימון של '+dayLabel(PLAN.date):'נוסף לאימון');}
+function noteItem(i){
+  const it=PLAN.items[i], d=drillById(it.id)||{name:''};
+  sheet(`<h2>הערות לתרגיל</h2><p class="xs muted" style="margin:4px 0 10px">${esc(d.name)} — באימון הזה בלבד</p>
+    <textarea id="nt" rows="5" placeholder="למשל: לעבוד רק ברגל חלשה, דני ויואב בזוג, לשים לב לגוף פתוח">${esc(it.notes||'')}</textarea>
+    <button class="btn primary big" style="margin-top:10px" id="ntsv">שמירה</button>`);
+  $('#ntsv').onclick=()=>{ it.notes=$('#nt').value.trim(); planChanged(); closeSheet(); renderPlanList(); };
+}
+function swapItem(i){
+  const cur=drillById(PLAN.items[i].id)||{cat:'tech'};
+  const age=S.team?S.team.age_profile:'b';
+  const alts=allDrills().filter(d=>d.cat===cur.cat && d.ages.includes(age) && d.id!==cur.id);
+  sheet(`<h2>החלפת תרגיל</h2><p class="xs muted" style="margin:4px 0 10px">תרגילים אחרים מאותה קטגוריה (${esc(CATS[cur.cat]?.label||'')})</p>
+    <div class="stack">${alts.map(d=>`<button class="prow" style="text-align:start" onclick="doSwap(${i},'${d.id}')">
+      <div class="pname"><b class="sm">${esc(d.name)}</b><span class="xs muted">${d.min} דק׳ · ${esc(d.src||'')}</span></div></button>`).join('')||'<p class="muted sm">אין חלופות.</p>'}</div>`);
+}
+function doSwap(i,id){ PLAN.items[i].id=id; planChanged(); closeSheet(); go('plan'); }
+async function delPlannedSession(){
+  if(!PLAN.sessionId || !confirm('למחוק את האימון המתוכנן?')) return;
+  await sb.from('coach_sessions').delete().eq('id',PLAN.sessionId);
+  PLAN={focus:'',items:[],date:today()}; LS('plan',PLAN); toast('נמחק'); go('program');
+}
+async function saveSessionForLater(){
+  const row={id:uid(),team_id:S.team.id,date:PLAN.date||today(),start_time:PLAN.time||null,focus:PLAN.focus||null,
+    planned_minutes:planMin(),status:'planned'};
+  const {error}=await sb.from('coach_sessions').insert(row);
+  if(error) return toast('שגיאה: '+error.message);
+  await sb.from('coach_session_drills').insert(PLAN.items.map((it,i)=>({session_id:row.id,drill_id:it.id,ord:i,minutes:it.min,notes:it.notes||null})));
+  PLAN={focus:'',items:[],date:today()}; LS('plan',PLAN);
+  toast('נשמר בתוכנית — '+dayLabel(row.date)); go('program');
+}
 
 async function startSession(){
-  const row={team_id:S.team.id,date:today(),focus:PLAN.focus||null,planned_minutes:planMin(),status:'live'};
-  const {data,error}=await sb.from('coach_sessions').insert(row).select().single();
-  if(error) return toast('שגיאה: '+error.message);
-  const sd=PLAN.items.map((it,i)=>({session_id:data.id,drill_id:it.id,ord:i,minutes:it.min}));
-  await sb.from('coach_session_drills').insert(sd);
-  S.session=data; S.sessionDrills=PLAN.items.map((it,i)=>({...it,ord:i}));
-  go('attend');
+  let sid=PLAN.sessionId;
+  if(sid){
+    clearTimeout(PLAN_T); await savePlanToSession();
+    await sb.from('coach_sessions').update({status:'live',date:today()}).eq('id',sid);
+  } else {
+    const row={team_id:S.team.id,date:today(),focus:PLAN.focus||null,planned_minutes:planMin(),status:'live'};
+    const {data,error}=await sb.from('coach_sessions').insert(row).select().single();
+    if(error) return toast('שגיאה: '+error.message);
+    sid=data.id;
+    await sb.from('coach_session_drills').insert(PLAN.items.map((it,i)=>({session_id:sid,drill_id:it.id,ord:i,minutes:it.min,notes:it.notes||null})));
+  }
+  PLAN={focus:'',items:[],date:today()}; LS('plan',PLAN);
+  LIVE={idx:0,start:0,timer:null,counts:{}};
+  await openSession(sid);
 }
 async function openSession(id){
   const {data}=await sb.from('coach_sessions').select('*').eq('id',id).single();
+  if(!data) return toast('האימון לא נמצא');
+  if(data.status==='planned'){
+    if(data.date>today() && !confirm(`האימון מתוכנן ל${dayLabel(data.date)}. להתחיל אותו היום?`)) return go('plan',{session:id});
+    await sb.from('coach_sessions').update({status:'live',date:today()}).eq('id',id); data.status='live'; data.date=today();
+  }
   const {data:sd}=await sb.from('coach_session_drills').select('*').eq('session_id',id).order('ord');
-  S.session=data; S.sessionDrills=(sd||[]).map(x=>({id:x.drill_id,min:x.minutes,ord:x.ord,rowId:x.id,rating:x.rating}));
+  S.session=data; S.sessionDrills=(sd||[]).map(x=>({id:x.drill_id,min:x.minutes,ord:x.ord,rowId:x.id,rating:x.rating,notes:x.notes||''}));
   if(data.status==='done') return go('sessionReport');
   go('attend');
 }
@@ -255,6 +366,7 @@ VIEWS.live = function(){
         <button class="btn sm primary" onclick="nextDrill()">${LIVE.idx<list.length-1?'הבא ▶':'סיום אימון'}</button>
       </div>
     </div>
+    ${it.notes?`<div class="alert ok" style="margin-top:10px">📝 ${esc(it.notes)}</div>`:''}
     ${d.points&&d.points.length?`<p class="sm muted" style="margin:10px 2px">💡 ${esc(d.points[0])}</p>`:''}
     <div class="hd"><h2>דירוג מהיר</h2><span class="xs muted">לחיצה על שחקן</span></div>
     <div class="tiles" id="tiles"></div>
@@ -299,13 +411,21 @@ function nextDrill(){resetTimer();
   if(LIVE.idx<S.sessionDrills.length-1){LIVE.idx++;go('live');}
   else endSession();
 }
-function showDrill(id){ const d=drillById(id); if(!d)return;
-  sheet(`<h2>${esc(d.name)}</h2><p class="xs muted" style="margin:4px 0 10px">${esc(d.src||'')} · ${d.min} דק׳ · ${esc(d.players||'')}</p>
-    ${svgDiag(d.diag)}
-    <p class="sm" style="margin-top:10px"><b>הכנה:</b> ${esc(d.setup||'')}</p>
+function showDrill(id, planIdx, autoplay){ const d=drillById(id); if(!d)return;
+  const pnote = planIdx!=null && PLAN.items[planIdx] ? PLAN.items[planIdx].notes : null;
+  sheet(`<h2>${esc(d.name)}</h2><p class="xs muted" style="margin:4px 0 10px">${esc(d.src||'')} · ${d.min} דק׳ · ${esc(d.players||'')}${d.area?' · '+esc(d.area):''}</p>
+    ${demoBox(d.diag, 'sd', d.name)}
+    ${pnote?`<div class="alert ok" style="margin-top:10px">📝 ${esc(pnote)}</div>`:''}
+    ${d.equip?`<p class="sm" style="margin-top:10px"><b>ציוד:</b> ${esc(d.equip)}</p>`:''}
+    <p class="sm" style="margin-top:6px"><b>הכנה:</b> ${esc(d.setup||'')}</p>
     <p class="sm" style="margin-top:6px">${esc(d.desc||'')}</p>
-    <h3 style="margin-top:12px">דגשים</h3><ul class="sm">${(d.points||[]).map(p=>`<li>${esc(p)}</li>`).join('')}</ul>
-    <h3 style="margin-top:10px">התקדמויות</h3><ul class="sm">${(d.prog||[]).map(p=>`<li>${esc(p)}</li>`).join('')}</ul>`);
+    ${(d.points||[]).length?`<h3 style="margin-top:12px">דגשים</h3><ul class="sm">${d.points.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>`:''}
+    ${(d.prog||[]).length?`<h3 style="margin-top:10px">התקדמויות</h3><ul class="sm">${d.prog.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>`:''}
+    ${d.notes?`<h3 style="margin-top:10px">הערות המאמן</h3><p class="sm">${esc(d.notes)}</p>`:''}
+    <div class="row" style="gap:6px;margin-top:12px">
+      <button class="btn sm" style="flex:1" onclick="closeSheet();openBoard('${d.id}')">▦ פתיחה בלוח</button>
+      ${S.view!=='live'?`<button class="btn sm primary" style="flex:1" onclick="addToPlan('${d.id}');closeSheet()">+ לאימון</button>`:''}</div>`);
+  if(autoplay) setTimeout(()=>{ const b=document.querySelector('#dbsd .dplay'); b&&b.click(); },60);
 }
 
 /* rating sheet */

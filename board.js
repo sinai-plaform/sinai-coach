@@ -2,7 +2,7 @@
    Produces exactly the diagram format the drill library already uses,
    so the board can open, edit and save any drill's picture. */
 
-const BOARD = { items:[], tool:'p_a', pend:null, drill:null, undo:[], numbers:true, n:{a:0,b:0,n:0,gk:0,co:0} };
+const BOARD = { items:[], tool:'p_a', pend:null, drill:null, undo:[], numbers:true, n:{a:0,b:0,n:0,gk:0,co:0}, meta:null };
 
 const B_TOOLS = [
   {k:'p_a', i:'🔵', l:'שחקן א׳'},
@@ -61,12 +61,14 @@ VIEWS.board = function(arg){
   arg = arg || {};
   if(arg.drill!==undefined){
     const d = drillById(arg.drill);
+    BOARD.anim=false;
+    if(BOARD.drill!==arg.drill) BOARD.meta=null;
     BOARD.drill = arg.drill;
     BOARD.items = d && d.diag && d.diag.items ? JSON.parse(JSON.stringify(d.diag.items)) : [];
   } else if(arg.fresh!==false && !arg.keep){
-    BOARD.drill = null; BOARD.items = [];
+    BOARD.drill = null; BOARD.items = []; BOARD.meta=null;
   }
-  BOARD.pend=null; BOARD.undo=[]; BOARD.n={a:0,b:0,n:0,gk:0,co:0};
+  BOARD.pend=null; BOARD.anim=false; BOARD.undo=[]; BOARD.n={a:0,b:0,n:0,gk:0,co:0};
   BOARD.items.forEach(it=>{ if(it.t==='p' && +it.n) BOARD.n[it.s]=Math.max(BOARD.n[it.s]||0, +it.n); });
 
   const d = BOARD.drill!=null ? drillById(BOARD.drill) : null;
@@ -83,10 +85,16 @@ VIEWS.board = function(arg){
         <button class="btn sm" style="flex:1" id="bnum">מספרים: ${BOARD.numbers?'כן':'לא'}</button>
         <button class="btn sm danger" style="flex:1" id="bclear">נקה</button>
       </div>
+      <button class="btn big" style="margin-top:10px;width:100%" id="bplay">▶ הדגמה של התרגיל</button>
+      <details class="card" style="margin-top:12px" id="bdet" open>
+        <summary style="cursor:pointer;font-weight:500">פרטי התרגיל — שם, מהלך, דגשים והערות</summary>
+        <div class="stack" style="margin-top:10px">${drillFieldsHtml(BOARD.meta || (d ? {...d, name: d.mine?d.name:(d.name+' — הגרסה שלי')} : null))}</div>
+      </details>
       <button class="btn primary big" style="margin-top:10px" id="bsave">${
-        d ? (d.mine ? 'שמירה לתרגיל' : 'שמירה כעותק שלי') : 'שמירה כתרגיל חדש'}</button>
+        d ? (d.mine && (!d.created_by||d.created_by===S.user.id) ? 'שמירת התרגיל' : 'שמירה כתרגיל שלי') : 'שמירה כתרגיל חדש'}</button>
+      <button class="btn big" style="margin-top:8px;width:100%" id="bsaveadd">שמירה והוספה לאימון</button>
       <p class="xs muted" style="margin-top:8px;text-align:center">
-        אפשר לסובב את הטלפון לרוחב — הלוח גדל.</p>
+        החיצים מונפשים לפי הסדר שבו ציירתם אותם. אפשר לסובב את הטלפון לרוחב — הלוח גדל.</p>
     </div>`);
 
   $('#btools').onclick = e=>{
@@ -99,7 +107,16 @@ VIEWS.board = function(arg){
     BOARD.items = JSON.parse(BOARD.undo.pop()); BOARD.pend=null; bDraw(); };
   $('#bclear').onclick = ()=>{ if(!BOARD.items.length) return; bPush(); BOARD.items=[]; BOARD.pend=null; bDraw(); };
   $('#bnum').onclick = ()=>{ BOARD.numbers=!BOARD.numbers; $('#bnum').textContent='מספרים: '+(BOARD.numbers?'כן':'לא'); };
-  $('#bsave').onclick = bSave;
+  $('#bsave').onclick = ()=>bSave(false);
+  $('#bsaveadd').onclick = ()=>bSave(true);
+  let stopAnim=null;
+  $('#bplay').onclick = ()=>{
+    if(stopAnim){ stopAnim(); stopAnim=null; BOARD.anim=false; $('#bplay').textContent='▶ הדגמה של התרגיל'; bDraw(); return; }
+    BOARD.pend=null; BOARD.anim=true; stopAnim=playDiag($('#bstage'), {items:BOARD.items});
+    $('#bplay').textContent='⏸ עצירה וחזרה לעריכה';
+  };
+  // remember typed details if the board is re-entered
+  $('#bdet').addEventListener('input', ()=>{ try{ BOARD.meta=readDrillFields(); BOARD.meta.desc=BOARD.meta.descr; }catch(e){} });
   bDraw(); bBind(); bHint();
 };
 
@@ -147,7 +164,7 @@ function bBind(){
     try{ st.releasePointerCapture(e.pointerId); }catch(err){} };
   st.addEventListener('pointerup', end);
   st.addEventListener('pointercancel', end);
-  st.addEventListener('click', e=>{ if(BOARD.tool==='move') return; const [x,y]=pt(e); bTap(x,y); });
+  st.addEventListener('click', e=>{ if(BOARD.tool==='move' || BOARD.anim) return; const [x,y]=pt(e); bTap(x,y); });
 }
 
 function bTap(x,y){
@@ -188,21 +205,15 @@ function bTap(x,y){
   bDraw();
 }
 
-/* ---------- saving ---------- */
-async function bSave(){
+/* ---------- saving: picture + every detail together ---------- */
+async function bSave(addAfter){
   if(!BOARD.items.length) return toast('הלוח ריק');
-  const diag={items:BOARD.items};
   const d = BOARD.drill!=null ? drillById(BOARD.drill) : null;
-
-  if(d && d.mine){
-    const {error}=await sb.from('coach_drills').update({diagram:diag}).eq('id',d.id);
-    if(error) return toast('שגיאה: '+error.message);
-    const {data}=await sb.from('coach_drills').select('*').eq('club_id',S.club.id); S.dbDrills=data||[];
-    toast('נשמר בתרגיל'); return go('library');
-  }
-  // a built-in drill, or nothing open: make a club drill carrying this picture
-  window.__diag = diag;
-  drillForm(null, d ? {...d, name:(d.name+' — הגרסה שלי')} : null);
+  const id = await saveDrill(readDrillFields(), {items:BOARD.items}, d?d.id:null, d);
+  if(!id) return;
+  BOARD.meta=null; BOARD.drill=id;
+  if(addAfter){ addToPlan(id); return go('plan'); }
+  toast('התרגיל נשמר'); go('library');
 }
 
 function openBoard(drillId){ go('board', drillId!=null ? {drill:drillId} : {}); }

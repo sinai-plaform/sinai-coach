@@ -28,6 +28,7 @@ VIEWS.library = function(){
           <p class="xs muted">◆ ${esc(d.src||'')}</p>
           <div class="row" style="margin-top:8px;gap:6px">
             <button class="btn sm" style="flex:1" onclick="showDrill('${d.id}')">פרטים</button>
+            <button class="btn sm" onclick="showDrill('${d.id}',null,true)" title="הדגמה">▶</button>
             <button class="btn sm primary" style="flex:1" onclick="addToPlan('${d.id}')">+ לאימון</button>
             <button class="btn sm ghost" onclick="openBoard('${d.id}')" title="לוח טקטי">▦</button>
             ${d.mine?`<button class="btn sm ghost" onclick="drillForm('${d.id}')">✎</button>`:''}
@@ -37,50 +38,66 @@ VIEWS.library = function(){
 };
 function setLF(k,v){LF[k]=LF[k]===v?null:v;go('library');}
 
-function drillForm(id, preset){
-  const d = id ? allDrills().find(x=>x.id===id)
-          : preset ? Object.assign({},preset,{id:null,mine:true})
-          : {cat:'tech',ages:[S.team?.age_profile||'b'],min:10,players:'8–12',area:'20×20',points:[],prog:[]};
-  const diag = window.__diag || d.diag || {items:[]};
-  sheet(`<h2>${id?'עריכת תרגיל':'תרגיל חדש'}</h2><div class="stack" style="margin-top:12px">
-    <label class="f">שם<input id="dn" value="${esc(d.name||'')}"></label>
+/* the full set of drill fields — used by the drill form and under the tactics board */
+function drillFieldsHtml(d){
+  d=d||{};
+  const ages=d.ages||[S.team?.age_profile||'b'];
+  return `<label class="f">שם<input id="dn" value="${esc(d.name||'')}"></label>
     <div class="grid2">
-      <label class="f">קטגוריה<select id="dc">${Object.entries(CATS).map(([k,v])=>`<option value="${k}" ${k===d.cat?'selected':''}>${v.label}</option>`).join('')}</select></label>
-      <label class="f">דקות<input id="dm" type="number" class="num" value="${d.min}"></label>
+      <label class="f">קטגוריה<select id="dc">${Object.entries(CATS).map(([k,v])=>`<option value="${k}" ${k===(d.cat||'tech')?'selected':''}>${v.label}</option>`).join('')}</select></label>
+      <label class="f">דקות<input id="dm" type="number" class="num" value="${d.min||10}"></label>
     </div>
     <div class="grid2">
       <label class="f">שחקנים<input id="dp" value="${esc(d.players||'')}"></label>
       <label class="f">שטח<input id="da" value="${esc(d.area||'')}"></label>
     </div>
-    <label class="f">גילאים<div class="chips" id="dages">${Object.entries(AGES).map(([k,v])=>`<button type="button" class="chip ${d.ages.includes(k)?'on':''}" data-a="${k}" onclick="this.classList.toggle('on')">${v}</button>`).join('')}</div></label>
+    <label class="f">גילאים<div class="chips" id="dages">${Object.entries(AGES).map(([k,v])=>`<button type="button" class="chip ${ages.includes(k)?'on':''}" data-a="${k}" onclick="this.classList.toggle('on')">${v}</button>`).join('')}</div></label>
     <label class="f">ציוד<input id="de" value="${esc(d.equip||'')}"></label>
     <label class="f">הכנה<textarea id="ds" rows="2">${esc(d.setup||'')}</textarea></label>
-    <label class="f">מהלך<textarea id="dd" rows="3">${esc(d.desc||'')}</textarea></label>
+    <label class="f">מהלך התרגיל<textarea id="dd" rows="3">${esc(d.desc||'')}</textarea></label>
     <label class="f">דגשים (שורה לכל אחד)<textarea id="dpt" rows="3">${esc((d.points||[]).join('\n'))}</textarea></label>
     <label class="f">התקדמויות (שורה לכל אחת)<textarea id="dpr" rows="2">${esc((d.prog||[]).join('\n'))}</textarea></label>
+    <label class="f">הערות<textarea id="dno" rows="2" placeholder="מה לזכור, טעויות נפוצות, וריאציות">${esc(d.notes||'')}</textarea></label>`;
+}
+function readDrillFields(){
+  const lines=id=>$(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
+  return {name:$('#dn').value.trim(),cat:$('#dc').value,ages:$$('#dages .chip.on').map(b=>b.dataset.a),
+    min:+$('#dm').value||10,players:$('#dp').value,area:$('#da').value,equip:$('#de').value,
+    setup:$('#ds').value,descr:$('#dd').value,points:lines('#dpt'),prog:lines('#dpr'),notes:$('#dno').value.trim()||null};
+}
+/* save a club drill. Only its author may overwrite it; anyone else gets a copy. */
+async function saveDrill(f, diag, id, existing){
+  if(!f.name) { toast('חסר שם'); return null; }
+  if(!f.ages.length){ toast('בחרו קבוצת גיל'); return null; }
+  const own = id && String(id).startsWith('my') && existing && existing.mine && (!existing.created_by || existing.created_by===S.user.id);
+  const row={...f, id: own?id:('my'+Date.now()), club_id:S.club.id, created_by:S.user.id,
+    src:'המועדון', diagram:diag||{items:[]}};
+  const {error}=await sb.from('coach_drills').upsert(row);
+  if(error){ toast('שגיאה: '+error.message); return null; }
+  const {data}=await sb.from('coach_drills').select('*').eq('club_id',S.club.id); S.dbDrills=data||[];
+  return row.id;
+}
+
+function drillForm(id, preset){
+  const d = id ? allDrills().find(x=>x.id===id)
+          : preset ? Object.assign({},preset,{id:null,mine:true})
+          : {cat:'tech',ages:[S.team?.age_profile||'b'],min:10,players:'8–12',area:'20×20',points:[],prog:[]};
+  const diag = window.__diag || d.diag || {items:[]};
+  const own = id && d.mine && (!d.created_by || d.created_by===S.user.id);
+  sheet(`<h2>${id?(own?'עריכת תרגיל':'עותק של תרגיל'):'תרגיל חדש'}</h2><div class="stack" style="margin-top:12px">
+    ${drillFieldsHtml(d)}
     <div class="f"><span>דיאגרמה</span>
-      ${diag.items&&diag.items.length?svgDiag(diag):'<p class="xs muted">עדיין אין ציור לתרגיל הזה.</p>'}
+      ${diag.items&&diag.items.length?demoBox(diag,'df',d.name):'<p class="xs muted">עדיין אין ציור לתרגיל הזה.</p>'}
       <button class="btn sm" style="margin-top:6px" id="ddraw">✏️ ${diag.items&&diag.items.length?'עריכת הציור':'ציור על הלוח'}</button></div>
-    <button class="btn primary big" id="dsv">שמירה</button>
-    ${id?'<button class="btn danger" id="ddel">מחיקה</button>':''}</div>`);
-  $('#ddraw').onclick=()=>{ closeSheet(); BOARD.items=JSON.parse(JSON.stringify(diag.items||[]));
-    go('board',{keep:true, back:'library'}); };
+    <button class="btn primary big" id="dsv">${id&&!own?'שמירה כעותק שלי':'שמירה'}</button>
+    ${own?'<button class="btn danger" id="ddel">מחיקה</button>':''}</div>`);
+  $('#ddraw').onclick=()=>{ closeSheet(); if(!id){ BOARD.items=JSON.parse(JSON.stringify(diag.items||[])); BOARD.meta=null; } go('board', id?{drill:id}:{keep:true}); };
   $('#dsv').onclick=async()=>{
-    const ages=$$('#dages .chip.on').map(b=>b.dataset.a);
-    if(!$('#dn').value.trim()) return toast('חסר שם');
-    if(!ages.length) return toast('בחרו קבוצת גיל');
-    const row={id:id&&String(id).startsWith('my')?id:('my'+Date.now()),club_id:S.club.id,created_by:S.user.id,
-      name:$('#dn').value.trim(),cat:$('#dc').value,ages,min:+$('#dm').value||10,players:$('#dp').value,area:$('#da').value,
-      equip:$('#de').value,setup:$('#ds').value,descr:$('#dd').value,
-      points:$('#dpt').value.split('\n').map(s=>s.trim()).filter(Boolean),
-      prog:$('#dpr').value.split('\n').map(s=>s.trim()).filter(Boolean),
-      src:'המועדון',diagram:diag};
-    const {error}=await sb.from('coach_drills').upsert(row);
-    if(error) return toast('שגיאה: '+error.message);
-    const {data}=await sb.from('coach_drills').select('*').eq('club_id',S.club.id); S.dbDrills=data||[];
+    const saved=await saveDrill(readDrillFields(), diag, id, d);
+    if(!saved) return;
     window.__diag=null; closeSheet(); go('library'); toast('נשמר');
   };
-  if(id) $('#ddel').onclick=async()=>{ if(!confirm('למחוק?'))return;
+  if(own) $('#ddel').onclick=async()=>{ if(!confirm('למחוק?'))return;
     await sb.from('coach_drills').delete().eq('id',id);
     const {data}=await sb.from('coach_drills').select('*').eq('club_id',S.club.id); S.dbDrills=data||[];
     closeSheet(); go('library'); };

@@ -27,7 +27,7 @@ const CATS = {
   ssg:{label:'משחקים קטנים',short:'משחק'},
   cool:{label:'שחרור וסיכום',short:'סיכום'}
 };
-const AGES = {a:'גן–ב׳', b:'ג׳–ד׳', c:'ה׳–ז׳'};
+const AGES = {a:'גן–ב׳', b:'ג׳–ד׳', c:'ה׳–ז׳', d:'ח׳ ומעלה'};
 
 const DRILLS = [
 // ---------- הפעלה ----------
@@ -626,3 +626,6 @@ DRILLS.forEach(d=>{ if(!d.src) d.src = SRC_OVERRIDE[d.id] || 'לה מאסיה ·
 
 // תבנית רביעית — דגש לחץ ומעברים
 TEMPLATES.d = {label:'ה׳–ז׳ · לחץ ומעברים',note:'חימום לחץ → רונדו מעבר → מלכודת → משחק',items:[['x6',8],['r7',10],['x5',14],['x7',15],['s6',8],['c1',5]]};
+
+// youth / adult teams use everything built for ה׳–ז׳
+DRILLS.forEach(d=>{ if(d.ages.includes('c') && !d.ages.includes('d')) d.ages.push('d'); });

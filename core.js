@@ -33,7 +33,7 @@ const $=(s,r)=>(r||document).querySelector(s);
 const $$=(s,r)=>[...(r||document).querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():'x'+Date.now()+Math.random().toString(16).slice(2));
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>new Date().toLocaleDateString('en-CA');
 const initials=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('');
 const fmtDate=d=>{const x=new Date(d);return x.toLocaleDateString('he-IL',{day:'numeric',month:'short'});};
 const daysAgo=d=>Math.floor((Date.now()-new Date(d).getTime())/864e5);
@@ -84,6 +84,7 @@ const TEAMC={a:'var(--ta)',b:'var(--tb)',n:'var(--tn)',gk:'var(--tgk)',co:'var(-
 function zig(pts){let d='';for(let i=0;i<pts.length-1;i++){const [x1,y1]=pts[i],[x2,y2]=pts[i+1];const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy)||1,n=Math.max(2,Math.round(len/3));const nx=-dy/len*1.3,ny=dx/len*1.3;if(i===0)d+=`M${x1},${y1}`;for(let k=1;k<=n;k++){const t=k/n,s=(k%2?1:-1)*(k===n?0:1);d+=` L${(x1+dx*t+nx*s).toFixed(1)},${(y1+dy*t+ny*s).toFixed(1)}`;}}return d;}
 const poly=p=>p.map(x=>x.join(',')).join(' ');
 function gr(it,w,depth){const x=it.x,y=it.y;if(it.dir==='w')return[x-depth,y-w/2,depth,w];if(it.dir==='e')return[x,y-w/2,depth,w];if(it.dir==='n')return[x-w/2,y-depth,w,depth];return[x-w/2,y,w,depth];}
+const OP=it=>it.o!=null?`<g opacity="${it.o}">`:'', CL=it=>it.o!=null?'</g>':'';
 function svgDiag(d,cls){
   const items=(d&&d.items)||[];
   let s=`<svg class="${cls||'dg'}" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="דיאגרמה"><defs>
@@ -101,10 +102,10 @@ function svgDiag(d,cls){
     case 'goal':{const[a,b,c,d2]=gr(it,it.w||16,4);s+=`<rect x="${a}" y="${b}" width="${c}" height="${d2}" fill="url(#nt)" stroke="#fff" stroke-width=".8"/>`;break;}
     case 'mg':{const[a,b,c,d2]=gr(it,7,2.2);s+=`<rect x="${a}" y="${b}" width="${c}" height="${d2}" fill="url(#nt)" stroke="#fff" stroke-width=".8"/>`;break;}
     case 'c':s+=`<path d="M${it.x},${it.y-2.3} L${it.x+2.1},${it.y+1.6} L${it.x-2.1},${it.y+1.6} Z" fill="${it.col||'#F2C14E'}" stroke="#000" stroke-opacity=".25" stroke-width=".3"/>`;break;
-    case 'pass':later.push(`<polyline points="${poly(it.pts)}" fill="none" stroke="#fff" stroke-width=".8" stroke-dasharray="2 1.4" marker-end="url(#aW)"/>`);break;
-    case 'run':later.push(`<polyline points="${poly(it.pts)}" fill="none" stroke="#FFD166" stroke-width=".7" marker-end="url(#aO)"/>`);break;
-    case 'drib':later.push(`<path d="${zig(it.pts)}" fill="none" stroke="#fff" stroke-width=".7" marker-end="url(#aW)"/>`);break;
-    case 'shot':later.push(`<polyline points="${poly(it.pts)}" fill="none" stroke="#fff" stroke-width="1.5" marker-end="url(#aW)"/>`);break;
+    case 'pass':later.push(OP(it)+`<polyline points="${poly(it.pts)}" fill="none" stroke="#fff" stroke-width=".8" stroke-dasharray="2 1.4" marker-end="url(#aW)"/>`+CL(it));break;
+    case 'run':later.push(OP(it)+`<polyline points="${poly(it.pts)}" fill="none" stroke="#FFD166" stroke-width=".7" marker-end="url(#aO)"/>`+CL(it));break;
+    case 'drib':later.push(OP(it)+`<path d="${zig(it.pts)}" fill="none" stroke="#fff" stroke-width=".7" marker-end="url(#aW)"/>`+CL(it));break;
+    case 'shot':later.push(OP(it)+`<polyline points="${poly(it.pts)}" fill="none" stroke="#fff" stroke-width="1.5" marker-end="url(#aW)"/>`+CL(it));break;
     case 'p':later.push(`<circle cx="${it.x}" cy="${it.y}" r="3.3" fill="${TEAMC[it.s]||TEAMC.a}" stroke="#fff" stroke-width=".7"/>`+(it.n?`<text x="${it.x}" y="${it.y+1.2}" font-size="${String(it.n).length>1?2.4:3.2}" fill="#fff" text-anchor="middle" font-weight="700">${esc(it.n)}</text>`:(it.s==='co'?`<text x="${it.x}" y="${it.y+1.2}" font-size="3" fill="#fff" text-anchor="middle" font-weight="700">מ</text>`:'')));break;
     case 'ball':later.push(`<circle cx="${it.x}" cy="${it.y}" r="1.7" fill="#fff" stroke="#1E1E1E" stroke-width=".45"/><circle cx="${it.x}" cy="${it.y}" r=".6" fill="#1E1E1E"/>`);break;
     case 'txt':later.push(`<text x="${it.x}" y="${it.y}" font-size="3.4" fill="#fff" text-anchor="middle" paint-order="stroke" stroke="#0B2A18" stroke-width=".9" stroke-opacity=".7">${esc(it.s)}</text>`);break;
@@ -118,7 +119,7 @@ function closeSheet(){ $('#sheetWrap').classList.remove('open'); }
 $('#sheetBd').onclick=closeSheet;
 
 /* ---------- drills (bundled global library + club drills) ---------- */
-function allDrills(){ return [...DRILLS, ...S.dbDrills.map(d=>({id:d.id,name:d.name,cat:d.cat,ages:d.ages,min:d.min,players:d.players,area:d.area,equip:d.equip,setup:d.setup,desc:d.descr,points:d.points||[],prog:d.prog||[],src:d.src||'המועדון',diag:d.diagram,mine:true}))]; }
+function allDrills(){ return [...DRILLS, ...S.dbDrills.map(d=>({id:d.id,name:d.name,cat:d.cat,ages:d.ages,min:d.min,players:d.players,area:d.area,equip:d.equip,setup:d.setup,desc:d.descr,points:d.points||[],prog:d.prog||[],src:d.src||'המועדון',diag:d.diagram,notes:d.notes||'',created_by:d.created_by,mine:true})).map(d=>{ if(d.ages&&d.ages.includes('c')&&!d.ages.includes('d')) d.ages=[...d.ages,'d']; return d; })]; }
 const drillById=id=>allDrills().find(d=>d.id===id);
 
 /* ---------- attributes ---------- */
@@ -223,7 +224,7 @@ async function bootstrap(){
   if(S.team) await loadTeam();
   $('#nav').classList.remove('hide');
   flushQueue();
-  go(LS('view')||'home');
+  go(LS('view')||'home',null,{replace:true});
 }
 function splash(t){
   $('#nav').classList.add('hide');
@@ -238,22 +239,51 @@ async function loadTeam(){
     .sort((a,b)=>(a.shirt_no||99)-(b.shirt_no||99)||a.name.localeCompare(b.name,'he'));
 }
 
-/* ---------- router ---------- */
+/* ---------- router ----------
+   Every screen change is a browser-history entry, so the in-app back
+   button, Android's back button and the swipe-back gesture all walk the
+   same stack. Re-rendering the screen you are already on replaces the
+   entry instead of stacking duplicates. */
 const VIEWS={};
-function go(v,arg){ S.view=v; LS('view',['home','squad','plan','library'].includes(v)?v:'home'); closeSheet();
-  $$('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.go===v));
+const TOP_VIEWS=['home','squad','program','library','more'];
+let NAV_DEPTH=0, CUR_ARG=null;
+function go(v,arg,opt){ opt=opt||{};
+  const same = v===S.view && JSON.stringify(arg??null)===JSON.stringify(CUR_ARG??null);
+  if(!opt.fromPop){
+    let st={v,arg:arg??null,d:NAV_DEPTH};
+    try{
+      if(opt.replace || same || !history.state){ history.replaceState(st,''); }
+      else if(TOP_VIEWS.includes(v)){ NAV_DEPTH=0; st.d=0; history.pushState(st,''); }
+      else { NAV_DEPTH++; st.d=NAV_DEPTH; history.pushState(st,''); }
+    }catch(e){}
+  }
+  S.view=v; CUR_ARG=arg??null;
+  LS('view',TOP_VIEWS.includes(v)?v:'home'); closeSheet();
+  $$('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.go===v || (b.dataset.go==='program'&&['plan','program'].includes(v))));
   window.scrollTo(0,0);
   (VIEWS[v]||VIEWS.home)(arg);
+}
+function goBack(){
+  if($('#sheetWrap').classList.contains('open')) return closeSheet();
+  if(history.state && history.state.d>0) history.back();
+  else go('home');
 }
 $$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.go));
 function screen(title, body, actions){
   $('#app').innerHTML = `<div class="topbar"><div class="in">
-      ${['home','squad','plan','library','more'].includes(S.view)?'':'<button class="iconbtn" id="bk">→</button>'}
+      ${TOP_VIEWS.includes(S.view)?'':'<button class="iconbtn" id="bk" aria-label="חזרה">→</button>'}
       <h1>${esc(title)}</h1>${actions||''}</div></div>
     <div class="wrap">${body}</div>`;
-  const bk=$('#bk'); if(bk) bk.onclick=()=>history.back();
+  const bk=$('#bk'); if(bk) bk.onclick=goBack;
 }
-addEventListener('popstate',()=>go(LS('view')||'home'));
+addEventListener('popstate',e=>{
+  if(S.role==='parent'||S.role==='player'){ if(typeof famHome==='function') famHome(); return; }
+  // a bottom sheet is open: back closes it and keeps the screen
+  if($('#sheetWrap').classList.contains('open')){ closeSheet(); try{history.pushState({v:S.view,arg:CUR_ARG,d:NAV_DEPTH},'');}catch(err){} return; }
+  const st=e.state;
+  if(st && st.v){ NAV_DEPTH=st.d||0; go(st.v, st.arg, {fromPop:true}); }
+  else go('home',null,{fromPop:true});
+});
 
 /* ---------- auth screens ---------- */
 function renderLogin(err){
@@ -307,7 +337,7 @@ function renderNewClub(){
     <div class="card stack">
       <label class="f">שם המועדון / בית הספר<input id="cn" placeholder="בית הספר לכדורגל"></label>
       <label class="f">שם הקבוצה הראשונה<input id="tn" placeholder="כיתה ג׳"></label>
-      <label class="f">קבוצת גיל<select id="ap"><option value="a">גן–ב׳</option><option value="b" selected>ג׳–ד׳</option><option value="c">ה׳–ז׳</option></select></label>
+      <label class="f">קבוצת גיל<select id="ap"><option value="a">גן–ב׳</option><option value="b" selected>ג׳–ד׳</option><option value="c">ה׳–ז׳</option><option value="d">ח׳ ומעלה</option></select></label>
       <label class="f">אורך אימון (דקות)<input id="sm" type="number" value="60" class="num"></label>
       <button class="btn primary big" id="mk">יוצרים</button>
       <p class="xs muted" id="m2"></p>
