@@ -15,7 +15,7 @@ async function bootstrapFamily(){
   const meta = S.user.user_metadata || {};
 
   if(S.role==='parent'){
-    const {data:g} = await sb.from('coach_guardians').select('*').eq('user_id',S.user.id).maybeSingle();
+    const {data:g} = await sb.from('coach_guardians').select('*').eq('user_id',S.user.id).limit(1).maybeSingle();
     FAM.guardian = g;
   }
   const {data:pl} = await sb.from('coach_players').select('*');
@@ -75,9 +75,12 @@ async function famHome(){
       </div>
     </div>`:''}
 
+    ${myLoginCard()}
+
     <div class="stack" style="margin-top:16px">
       <button class="btn ghost" onclick="signOut()">יציאה</button></div>
   </div>`;
+  bindLoginCard();
 
   const cm=$('#cMedia');
   if(cm) cm.onchange=async()=>{
@@ -87,6 +90,33 @@ async function famHome(){
       .eq('id',FAM.guardian.id).select('media_consent');
     if(error || !data || !data.length){ cm.checked=!v; return toast('לא נשמר'); }
     FAM.guardian.media_consent=v; toast(v?'אושר':'בוטל');
+  };
+}
+
+/* ---------- my own login: phone + a password the person chooses ---------- */
+function myLoginId(){ const m=S.user.user_metadata||{}, e=S.user.email||'';
+  if(m.phone) return m.phone.replace(/^\+972/,'0');
+  const k=e.match(/^([^@]+)@kid\.sinai-coach\.app$/); return k?k[1]:e; }
+function myLoginCard(){
+  const set=(S.user.user_metadata||{}).pw_set;
+  return `<div class="card" style="margin-top:14px${set?'':';border:2px solid var(--accent)'}">
+    <h3>${set?'הכניסה שלי':'קביעת סיסמה'}</h3>
+    <p class="xs muted" style="margin:4px 0 10px">${set
+      ?`נכנסים עם <b dir="ltr">${esc(myLoginId())}</b> והסיסמה שלך.`
+      :`בפעם הבאה נכנסים עם הטלפון <b dir="ltr">${esc(myLoginId())}</b> וסיסמה — בחרו אותה עכשיו.`}</p>
+    <div class="row" style="gap:6px"><input id="mypw" type="password" autocomplete="new-password" placeholder="סיסמה חדשה (6+ תווים)" style="flex:1">
+      <button class="btn ${set?'':'primary'}" id="mypwb">${set?'החלפה':'שמירה'}</button></div></div>`;
+}
+function bindLoginCard(){
+  const b=$('#mypwb'); if(!b) return;
+  b.onclick=async()=>{
+    const pw=$('#mypw').value; if(pw.length<6) return toast('סיסמה של 6 תווים לפחות');
+    b.disabled=true;
+    const {data,error}=await sb.auth.updateUser({password:pw, data:{pw_set:true}});
+    b.disabled=false;
+    if(error) return toast('לא נשמר: '+error.message);
+    if(data&&data.user) S.user=data.user;
+    toast('הסיסמה נשמרה'); famHome();
   };
 }
 
@@ -161,13 +191,16 @@ async function famKid(id){
 
     ${S.role==='parent'&&gradeOf(k)>=(FAM.club?.player_login_min_grade??3)?`
       <div class="card" style="margin-top:14px"><h3>חשבון ל${esc(k.name.split(' ')[0])}</h3>
-        <p class="xs muted" style="margin:4px 0 10px">${k.login_enabled&&k.username
-          ?`פתוח · שם המשתמש: <b dir="ltr">${esc(k.username)}</b>. אפשר להחליף סיסמה או לסגור.`
-          :'פותחים לילד שם משתמש וסיסמה, והוא נכנס בלשונית "שחקן". אפשר לסגור בכל רגע.'}</p>
+        <p class="xs muted" style="margin:4px 0 10px">${k.login_enabled&&(k.phone||k.username)
+          ?`פתוח · נכנס עם <b dir="ltr">${esc(k.phone?k.phone.replace(/^\+972/,'0'):k.username)}</b>. אפשר לקבוע לו סיסמה חדשה או לסגור.`
+          :'מוסיפים את הטלפון של הילד — וזה פותח לו חשבון. הוא נכנס עם הטלפון וסיסמה. אפשר לסגור בכל רגע.'}</p>
         <div class="stack">
-          <label class="f">שם משתמש (באנגלית)<input id="kun" dir="ltr" autocapitalize="off" value="${esc(k.username||'')}" placeholder="noam.c"></label>
-          <label class="f">סיסמה${k.username?' חדשה':''}<input id="kpw" type="text" dir="ltr" autocomplete="new-password" placeholder="6 תווים לפחות"></label>
-          <button class="btn primary" id="kopen">${k.login_enabled&&k.username?'עדכון':'פתיחת חשבון'}</button>
+          <label class="f">הטלפון של הילד<input id="kph" type="tel" inputmode="tel" dir="ltr" value="${esc(k.phone?k.phone.replace(/^\+972/,'0'):'')}" placeholder="05x-xxxxxxx"></label>
+          <details ${!k.phone&&k.username?'open':''}><summary class="xs muted">אין לילד טלפון? שם משתמש במקום</summary>
+            <label class="f" style="margin-top:6px">שם משתמש (באנגלית)<input id="kun" dir="ltr" autocapitalize="off" value="${esc(k.username||'')}" placeholder="noam.c"></label></details>
+          <label class="f">סיסמה${k.login_enabled?' חדשה':''}<input id="kpw" type="text" dir="ltr" autocomplete="new-password" placeholder="6 תווים לפחות"></label>
+          <p class="xs muted">עם טלפון אפשר להשאיר סיסמה ריקה: הילד יקבל קוד ב-SMS ויבחר סיסמה בעצמו ("כניסה ראשונה").</p>
+          <button class="btn primary" id="kopen">${k.login_enabled?'עדכון':'פתיחת חשבון'}</button>
           ${k.login_enabled?'<button class="btn danger" id="kclose">סגירת החשבון</button>':''}
         </div></div>`:''}
 
@@ -195,19 +228,22 @@ async function famKid(id){
   };
   const ko=$('#kopen');
   if(ko) ko.onclick=async()=>{
-    const username=$('#kun').value.trim().toLowerCase(), password=$('#kpw').value;
-    if(!/^[a-z0-9._]{3,20}$/.test(username)) return toast('שם משתמש: 3–20 אותיות באנגלית או ספרות');
-    if(password.length<6) return toast('סיסמה של 6 תווים לפחות');
+    const phone=$('#kph').value.trim(), username=$('#kun').value.trim().toLowerCase(), password=$('#kpw').value;
+    if(!phone && !/^[a-z0-9._]{3,20}$/.test(username)) return toast('צריך טלפון של הילד, או שם משתמש באנגלית');
+    if(!phone && !password && !k.login_enabled) return toast('עם שם משתמש צריך גם סיסמה');
+    if(password && password.length<6) return toast('סיסמה של 6 תווים לפחות');
     ko.disabled=true; ko.textContent='שומר…';
-    const r=await fn('child_set',{player_id:k.id,username,password},true);
+    const r=await fn('child_set',{player_id:k.id,phone,username:phone?'':username,password},true);
     ko.disabled=false;
     if(r.error){ ko.textContent='נסו שוב'; return toast(r.error); }
-    k.username=username; k.login_enabled=true;
-    sheet(`<h2>החשבון של ${esc(k.name.split(' ')[0])} מוכן</h2>
-      <p class="sm" style="margin:8px 0">נכנסים באפליקציה ← לשונית "שחקן":</p>
-      <div class="card"><p>שם משתמש: <b dir="ltr">${esc(username)}</b></p><p>סיסמה: <b dir="ltr">${esc(password)}</b></p></div>
+    if(phone){ k.phone=phone; k.username=null; } else k.username=username;
+    k.login_enabled=true;
+    const login=phone||username, first=k.name.split(' ')[0];
+    sheet(`<h2>החשבון של ${esc(first)} מוכן</h2>
+      <div class="card" style="margin-top:10px"><p>כניסה עם: <b dir="ltr">${esc(login)}</b></p>
+      ${password?`<p>סיסמה: <b dir="ltr">${esc(password)}</b></p>`:`<p class="sm">בכניסה הראשונה ${esc(first)} לוחץ "כניסה ראשונה", מקבל קוד ב-SMS ובוחר סיסמה.</p>`}</div>
       <button class="btn primary big" style="margin-top:12px" id="kcopy">העתקה לשליחה לילד</button>`);
-    $('#kcopy').onclick=()=>{ const t=`כניסה ל-SINAI Coach: ${location.origin+location.pathname}\nלשונית "שחקן"\nשם משתמש: ${username}\nסיסמה: ${password}`;
+    $('#kcopy').onclick=()=>{ const t=`כניסה ל-SINAI Coach: ${location.origin}\nטלפון / שם משתמש: ${login}\n`+(password?`סיסמה: ${password}`:'בפעם הראשונה: "כניסה ראשונה" ← קוד ב-SMS ← בוחרים סיסמה');
       (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('הועתק')).catch(()=>toast(t)); };
     famKid(k.id);
   };

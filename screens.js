@@ -82,7 +82,7 @@ VIEWS.squad = async function(){
     const a=age(p.birth_date);
     return `<div class="prow" onclick="go('player','${p.id}')">
       <div class="av">${p.shirt_no?p.shirt_no:esc(initials(p.name))}</div>
-      <div class="pname"><b>${esc(p.name)}</b><span class="xs muted">${[p.position||'',a?a+' שנים':''].filter(Boolean).join(' · ')||'—'}</span></div>
+      <div class="pname"><b>${esc(p.name)}</b><span class="xs muted">${[p.position||'',p.birth_date?fmtBirth(p.birth_date)+' ('+a+')':''].filter(Boolean).join(' · ')||'—'}</span></div>
       ${st}<span class="pill ${vals.length?'info':''}">${ov}</span></div>`;
   }).join('');
   $('#sq').innerHTML = S.players.length

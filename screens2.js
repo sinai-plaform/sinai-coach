@@ -274,13 +274,15 @@ VIEWS.player = async function(pid){
   const p=S.players.find(x=>x.id===pid); if(!p) return go('squad');
   screen(p.name, '<div class="empty">טוען…</div>', `<button class="iconbtn" id="edp">✎</button>`);
   $('#edp').onclick=()=>playerForm(p);
-  const [{data:obs},{data:disc},{data:tests},{data:goals},{data:att}] = await Promise.all([
+  const [{data:obs},{data:disc},{data:tests},{data:goals},{data:att},{data:fresh}] = await Promise.all([
     sb.from('coach_observations').select('*').eq('player_id',pid).eq('voided',false).order('at',{ascending:false}).limit(1200),
     sb.from('coach_discipline').select('*').eq('player_id',pid).order('at',{ascending:false}).limit(20),
     sb.from('coach_tests').select('*').eq('player_id',pid).order('at',{ascending:false}).limit(20),
     sb.from('coach_goals').select('*').eq('player_id',pid).order('created_at',{ascending:false}).limit(5),
-    sb.from('coach_attendance').select('present,session_id').eq('player_id',pid).limit(60)
+    sb.from('coach_attendance').select('present,session_id').eq('player_id',pid).limit(60),
+    sb.from('coach_players').select('*').eq('id',pid).maybeSingle()
   ]);
+  if(fresh) Object.assign(p,fresh);   // details a parent filled in since the squad was loaded
   const list=[...(obs||[]),...LOCAL_OBS.filter(o=>o.player_id===pid)];
   const sc=scoreFromObs(list);
   const isGk=p.position==='שוער';
@@ -298,7 +300,8 @@ VIEWS.player = async function(pid){
       <div class="spread"><div>
         <h2>${esc(p.name)}</h2>
         <p class="muted sm">${[p.position,p.shirt_no?'#'+p.shirt_no:'',age(p.birth_date)?age(p.birth_date)+' שנים':''].filter(Boolean).join(' · ')}</p>
-        ${p.birth_date?`<p class="xs muted">נולד בחודש ${new Date(p.birth_date).getMonth()+1} — גיל יחסי${new Date(p.birth_date).getMonth()<3?' גבוה בשנתון':new Date(p.birth_date).getMonth()>8?' נמוך בשנתון':''}</p>`:''}
+        ${p.birth_date?`<p class="xs muted">🎂 ${fmtBirth(p.birth_date)}${new Date(p.birth_date).getMonth()<3?' · גיל יחסי גבוה בשנתון':new Date(p.birth_date).getMonth()>8?' · גיל יחסי נמוך בשנתון':''}</p>`:`<p class="xs muted">🎂 אין תאריך לידה — <a href="#" onclick="event.preventDefault();playerForm(S.players.find(x=>x.id==='${p.id}'))">הוספה</a></p>`}
+        ${p.phone?`<p class="xs muted">📱 <span dir="ltr">${esc(p.phone.replace(/^\+972/,'0'))}</span></p>`:''}
       </div><div style="text-align:center">
         <div style="font-family:'Secular One';font-size:32px;line-height:1">${showNum?overall:(vals.length?'●':'—')}</div>
         <p class="xs muted">${showNum?'ציון כללי':'רמה'}</p></div></div>
@@ -518,12 +521,17 @@ VIEWS.more = function(){
     <button class="btn big" onclick="go('roster')">📥 ייבוא רשימת שחקנים</button>
     <button class="btn big" onclick="go('teamedit')">⚙️ הגדרות קבוצה</button>
     <button class="btn big" onclick="go('settings')">🏫 מועדון וקבוצות</button>
+    <button class="btn big hide" id="toFam" onclick="S.role='parent';bootstrapFamily()">👨‍👧 מעבר לאפליקציית ההורה</button>
     <div class="sep"></div>
-    <p class="xs muted">${esc(S.club?.name||'')} · ${esc(S.user?.email||'')} · ${S.role==='coach'?'מאמן':S.role}</p>
+    <p class="xs muted">${esc(S.club?.name||'')} · ${esc(whoAmI())} · ${S.role==='coach'?'מאמן':S.role}</p>
     <p class="xs muted">ממתינים לסנכרון: ${QUEUE.length}</p>
     <button class="btn ghost" onclick="flushQueue()">סנכרון עכשיו</button>
     <button class="btn danger" onclick="signOut()">יציאה</button></div>`);
+  sb.from('coach_guardians').select('id',{count:'exact',head:true}).eq('user_id',S.user.id)
+    .then(({count})=>{ const b=$('#toFam'); if(b&&count) b.classList.remove('hide'); });
 };
+function whoAmI(){ const m=S.user?.user_metadata||{}; const e=S.user?.email||'';
+  return m.phone ? m.phone.replace(/^\+972/,'0') : /sinai-coach\.app$/.test(e) ? (m.name||'') : e; }
 async function signOut(){ await sb.auth.signOut(); LS('dev',null); location.reload(); }
 
 VIEWS.discipline = async function(){

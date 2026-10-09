@@ -41,6 +41,7 @@ const fmtDate=d=>{const x=new Date(d);return x.toLocaleDateString('he-IL',{day:'
 const daysAgo=d=>Math.floor((Date.now()-new Date(d).getTime())/864e5);
 const LS=(k,v)=>{try{if(v===undefined){const r=localStorage.getItem('sc.'+k);return r?JSON.parse(r):null;}localStorage.setItem('sc.'+k,JSON.stringify(v));}catch(e){return null;}};
 let toastT; function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2000);}
+const fmtBirth=d=>{ const [y,m,dd]=String(d).slice(0,10).split('-'); return `${+dd}.${+m}.${y}`; };
 function age(bd){if(!bd)return null;const b=new Date(bd),n=new Date();let a=n.getFullYear()-b.getFullYear();if(n<new Date(n.getFullYear(),b.getMonth(),b.getDate()))a--;return a;}
 
 /* ---------- offline queue ---------- */
@@ -210,12 +211,13 @@ async function bootstrap(){
   if(!user){ renderLogin(); return; }
   S.user = user;
 
-  // 3 — families go to their own app
-  const role = (user.user_metadata||{}).role;
-  if(role==='parent' || role==='player'){ S.role=role; return bootstrapFamily(); }
-
-  let {data:mem} = await sb.from('coach_members').select('*, coach_clubs(*)').eq('user_id',user.id);
-  if(!mem||!mem.length){ renderNewClub(); return; }
+  // 3 — staff go to the coach app, everyone else to the family app
+  const meta = user.user_metadata||{};
+  let {data:mem} = await sb.from('coach_members').select('*, coach_clubs(*)').eq('user_id',user.id).in('role',['coach','assistant','manager']);
+  if(!mem||!mem.length){
+    if(meta.coach || meta.role==='coach' || !meta.role){ renderNewClub(); return; }
+    S.role = meta.role==='player' ? 'player' : 'parent'; return bootstrapFamily();
+  }
   S.club = mem[0].coach_clubs; S.role = mem[0].role;
   const [t,a,d] = await Promise.all([
     sb.from('coach_teams').select('*').eq('club_id',S.club.id).order('name'),
@@ -288,90 +290,117 @@ addEventListener('popstate',e=>{
   else go('home',null,{fromPop:true});
 });
 
-/* ---------- auth screens ---------- */
+/* ---------- auth screens ----------
+   One door for everyone: phone (or username / email) + password.
+   The first time — or after a forgotten password — the person proves the
+   phone with an SMS code and chooses their own password. */
+function normPhoneDigits(v){
+  let d=String(v||'').replace(/[^0-9+]/g,'');
+  if(d.startsWith('+')) d=d.slice(1); else if(d.startsWith('00')) d=d.slice(2);
+  else if(d.startsWith('0')) d='972'+d.slice(1); else if(d.length>=8&&d.length<=9) d='972'+d;
+  return d.replace(/\D/g,'');
+}
+const looksPhone=v=>/^[+0-9][0-9\s\-()]{7,}$/.test(String(v||'').trim());
+function loginCandidates(id){
+  id=id.trim();
+  if(id.includes('@')) return [id.toLowerCase()];
+  if(looksPhone(id)){ const d=normPhoneDigits(id); return [`p${d}@guardian.sinai-coach.app`,`k${d}@kid.sinai-coach.app`]; }
+  return [id.toLowerCase()+'@kid.sinai-coach.app'];
+}
 function renderLogin(err){
   $('#nav').classList.add('hide');
-  let mode=LS('loginMode')||'in';     // in | up | parent | kid
-  let otpPhone=null;
-  const tabs=`<div class="chips" style="justify-content:center;margin-bottom:12px">
-      <button class="chip" data-m="in">מאמן</button><button class="chip" data-m="parent">הורה</button><button class="chip" data-m="kid">שחקן</button></div>`;
+  let mode='in';                 // in | otp (first time / forgot) | signup (new coach) | email (coach signup by email)
+  let sent=null;                 // {phone, options}
+  const head={in:'אימונים, נתוני שחקנים והורים — במקום אחד', otp:'כניסה ראשונה או שכחתי סיסמה', signup:'פתיחת חשבון מאמן', email:'פתיחת חשבון מאמן עם אימייל'};
   const draw=()=>{
-    const coach = mode==='in'||mode==='up';
-    $('#app').innerHTML=`<div class="wrap" style="max-width:420px;padding-top:44px">
-    <div style="text-align:center;margin-bottom:18px">
+    let body='';
+    if(mode==='in') body=`
+      <label class="f">טלפון או שם משתמש<input id="id" autocomplete="username" autocapitalize="off" dir="ltr" placeholder="050-0000000"></label>
+      <label class="f">סיסמה<input id="pw" type="password" autocomplete="current-password"></label>
+      <button class="btn primary big" id="doBtn">כניסה</button>
+      <button class="btn ghost sm" id="toOtp">כניסה ראשונה / שכחתי סיסמה</button>`;
+    else if(!sent) body=`
+      ${mode==='signup'?'<label class="f">שם מלא<input id="nm" autocomplete="name"></label>':''}
+      ${mode==='email'?`<label class="f">אימייל<input id="em" type="email" inputmode="email" autocapitalize="off" dir="ltr"></label>
+        <label class="f">סיסמה<input id="pw" type="password" autocomplete="new-password" placeholder="6 תווים לפחות"></label>`
+      :`<label class="f">מספר טלפון<input id="ph" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" placeholder="050-0000000"></label>
+        <p class="xs muted">נשלח קוד ב-SMS. אחריו בוחרים סיסמה, ומעכשיו נכנסים עם הטלפון והסיסמה.</p>`}
+      <button class="btn primary big" id="doBtn">${mode==='email'?'פתיחת חשבון':'שליחת קוד'}</button>`;
+    else body=`
+      <p class="sm">שלחנו קוד ל-<b dir="ltr">${esc(sent.phone)}</b></p>
+      ${sent.options&&sent.options.length>1?`<label class="f">למי הכניסה?<select id="who">${sent.options.map(o=>`<option value="${o.id}">${esc(o.label)}</option>`).join('')}</select></label>`:''}
+      <label class="f">הקוד<input id="cd" inputmode="numeric" autocomplete="one-time-code" maxlength="8" dir="ltr" style="letter-spacing:6px;text-align:center;font-size:20px"></label>
+      <label class="f">בחירת סיסמה<input id="pw" type="password" autocomplete="new-password" placeholder="6 תווים לפחות"></label>
+      <button class="btn primary big" id="doBtn">אישור וכניסה</button>
+      <button class="btn ghost sm" id="reBtn">מספר אחר / שליחה מחדש</button>`;
+    $('#app').innerHTML=`<div class="wrap" style="max-width:420px;padding-top:50px">
+    <div style="text-align:center;margin-bottom:20px">
       <div style="font-size:44px">⚽</div>
       <h1 style="margin-top:8px">SINAI Coach</h1>
-      <p class="muted sm">${mode==='up'?'פתיחת חשבון מאמן חדש':mode==='parent'?'כניסת הורים — עם קוד לטלפון':mode==='kid'?'כניסת שחקן':'אימונים, נתוני שחקנים והורים — במקום אחד'}</p>
+      <p class="muted sm">${head[mode]}</p>
     </div>
-    ${tabs}
     <div class="card stack">
       <div id="err" class="alert hide"></div>
-      ${coach?`
-        <label class="f">אימייל<input id="em" type="email" autocomplete="username" inputmode="email" autocapitalize="off"></label>
-        <label class="f">סיסמה<input id="pw" type="password" autocomplete="${mode==='in'?'current-password':'new-password'}"></label>
-        <button class="btn primary big" id="doBtn">${mode==='in'?'כניסה':'פתיחת חשבון'}</button>
-        <button class="btn ghost sm" id="swBtn">${mode==='in'?'אין לי חשבון — הרשמה':'← יש לי כבר חשבון'}</button>`
-      : mode==='parent' ? (!otpPhone ? `
-        <label class="f">מספר הטלפון שמסרת למאמן<input id="ph" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" placeholder="050-0000000"></label>
-        <button class="btn primary big" id="doBtn">שליחת קוד ב-SMS</button>
-        <p class="xs muted">אם קיבלת קישור מהמאמן בוואטסאפ — אפשר פשוט ללחוץ עליו.</p>`
-        : `<p class="sm">שלחנו קוד בן 6 ספרות ל-<b dir="ltr">${esc(otpPhone)}</b></p>
-        <label class="f">הקוד<input id="cd" inputmode="numeric" autocomplete="one-time-code" maxlength="8" dir="ltr" style="letter-spacing:6px;text-align:center;font-size:20px"></label>
-        <button class="btn primary big" id="doBtn">כניסה</button>
-        <button class="btn ghost sm" id="reBtn">מספר אחר / שליחה מחדש</button>`)
-      : `
-        <label class="f">שם משתמש<input id="un" autocapitalize="off" autocomplete="username" dir="ltr"></label>
-        <label class="f">סיסמה<input id="pw" type="password" autocomplete="current-password"></label>
-        <button class="btn primary big" id="doBtn">כניסה</button>
-        <p class="xs muted">את שם המשתמש והסיסמה פותח ההורה באפליקציה שלו.</p>`}
+      ${body}
+    </div>
+    <div style="text-align:center;margin-top:14px" class="stack">
+      ${mode==='in'?'<button class="btn ghost sm" id="toUp">מאמן חדש? פתיחת חשבון</button>':'<button class="btn ghost sm" id="toIn">← חזרה לכניסה</button>'}
+      ${mode==='signup'&&!sent?'<button class="btn ghost sm" id="toEm">הרשמה עם אימייל במקום</button>':''}
     </div></div>`;
-    $$('[data-m]').forEach(b=>{ b.classList.toggle('on', b.dataset.m===mode || (b.dataset.m==='in'&&mode==='up'));
-      b.onclick=()=>{ mode=b.dataset.m; LS('loginMode',mode); err=null; otpPhone=null; draw(); }; });
     if(err) showErr(err);
-    const sw=$('#swBtn'); if(sw) sw.onclick=()=>{ mode = mode==='in'?'up':'in'; err=null; draw(); };
-    const re=$('#reBtn'); if(re) re.onclick=()=>{ otpPhone=null; draw(); };
+    const on=(id,f)=>{ const x=$('#'+id); if(x) x.onclick=f; };
+    on('toOtp',()=>{ mode='otp'; sent=null; err=null; draw(); });
+    on('toUp',()=>{ mode='signup'; sent=null; err=null; draw(); });
+    on('toIn',()=>{ mode='in'; sent=null; err=null; draw(); });
+    on('toEm',()=>{ mode='email'; err=null; draw(); });
+    on('reBtn',()=>{ sent=null; draw(); });
     $('#doBtn').onclick=submit;
     $$('#app input').forEach(i=>i.onkeydown=e=>{ if(e.key==='Enter') submit(); });
   };
   const showErr=m=>{ const e=$('#err'); e.textContent=m; e.classList.remove('hide'); };
-  const busy=(b,t)=>{ const x=$('#doBtn'); x.disabled=b; if(b) x.textContent=t; };
+  const busy=(b,t)=>{ const x=$('#doBtn'); x.disabled=b; if(t) x.textContent=t; };
   async function submit(){
-    $('#err').classList.add('hide');
-    if(mode==='parent'){
-      if(!otpPhone){
-        const ph=$('#ph').value.trim(); if(!ph) return showErr('צריך מספר טלפון');
-        busy(true,'שולח…');
-        const r=await fn('otp_send',{phone:ph});
-        if(r.error){ busy(false); draw(); return showErr(r.error); }
-        otpPhone=ph; return draw();
-      }
-      const code=$('#cd').value.trim(); if(code.length<4) return showErr('צריך את הקוד מה-SMS');
-      busy(true,'בודק…');
-      const r=await fn('otp_check',{phone:otpPhone,code});
-      if(r.error){ busy(false); $('#doBtn').textContent='כניסה'; return showErr(r.error); }
-      const s2=await useToken(r.token_hash); if(s2.error) return showErr(s2.error);
-      if(r.device) LS('dev', r.device);
-      return bootstrap();
-    }
-    if(mode==='kid'){
-      const un=$('#un').value.trim().toLowerCase(), pw=$('#pw').value;
-      if(!un||!pw) return showErr('צריך שם משתמש וסיסמה');
+    $('#err').classList.add('hide'); err=null;
+    if(mode==='in'){
+      const id=$('#id').value.trim(), pw=$('#pw').value;
+      if(!id||!pw) return showErr('צריך טלפון או שם משתמש, וסיסמה');
       busy(true,'מתחבר…');
-      const {error}=await sb.auth.signInWithPassword({email:un+'@kid.sinai-coach.app',password:pw});
-      if(error){ busy(false); $('#doBtn').textContent='כניסה'; return showErr('שם משתמש או סיסמה שגויים'); }
-      return bootstrap();
+      for(const email of loginCandidates(id)){
+        const {error}=await sb.auth.signInWithPassword({email,password:pw});
+        if(!error) return bootstrap();
+      }
+      busy(false,'כניסה');
+      return showErr('הפרטים לא נכונים. פעם ראשונה כאן? "כניסה ראשונה / שכחתי סיסמה"');
     }
-    const email=$('#em').value.trim(), password=$('#pw').value;
-    if(!email) return showErr('צריך למלא אימייל');
-    if(password.length<6) return showErr('הסיסמה צריכה להיות באורך 6 תווים לפחות');
-    if(mode==='up'){
+    if(mode==='email'){
+      const email=$('#em').value.trim(), password=$('#pw').value;
+      if(!email) return showErr('צריך למלא אימייל');
+      if(password.length<6) return showErr('הסיסמה צריכה להיות באורך 6 תווים לפחות');
       busy(true,'פותח חשבון…');
       const r=await fn('signup',{email,password});
-      if(r.error){ busy(false); $('#doBtn').textContent='פתיחת חשבון'; return showErr(r.error); }
+      if(r.error){ busy(false,'פתיחת חשבון'); return showErr(r.error); }
+      const {error}=await sb.auth.signInWithPassword({email,password});
+      if(error){ busy(false,'פתיחת חשבון'); return showErr(error.message); }
+      return bootstrap();
     }
-    busy(true,'מתחבר…');
-    const {error}=await sb.auth.signInWithPassword({email,password});
-    if(error){ busy(false); $('#doBtn').textContent=mode==='in'?'כניסה':'פתיחת חשבון'; return showErr(/Invalid login/i.test(error.message)?'אימייל או סיסמה שגויים':error.message); }
+    const purpose = mode==='signup'?'signup':'login';
+    if(!sent){
+      const ph=$('#ph').value.trim(); if(!ph) return showErr('צריך מספר טלפון');
+      if(mode==='signup' && !$('#nm').value.trim()) return showErr('צריך שם');
+      if(mode==='signup') renderLogin.name_=$('#nm').value.trim();
+      busy(true,'שולח…');
+      const r=await fn('otp_send',{phone:ph,purpose});
+      if(r.error){ busy(false,'שליחת קוד'); return showErr(r.error); }
+      sent={phone:ph,options:r.options||[]}; return draw();
+    }
+    const code=$('#cd').value.trim(), password=$('#pw').value;
+    if(code.length<4) return showErr('צריך את הקוד מה-SMS');
+    if(password.length<6) return showErr('סיסמה של 6 תווים לפחות');
+    const who=$('#who')?$('#who').value:(sent.options[0]?.id||'me');
+    busy(true,'בודק…');
+    const r=await fn('otp_check',{phone:sent.phone,code,password,purpose,who,name:renderLogin.name_||''});
+    if(r.error){ busy(false,'אישור וכניסה'); return showErr(r.error); }
+    const s2=await useToken(r.token_hash); if(s2.error){ busy(false,'אישור וכניסה'); return showErr(s2.error); }
     bootstrap();
   }
   draw();
