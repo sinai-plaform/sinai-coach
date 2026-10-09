@@ -70,10 +70,8 @@ VIEWS.squad = async function(){
   $('#addp').onclick=()=>playerForm();
   if(!S.team) return $('#sq').innerHTML='<div class="empty">אין קבוצה</div>';
   const ids=S.players.map(p=>p.id);
-  let obs=[];
-  if(ids.length){ const {data}=await sb.from('coach_observations').select('player_id,attribute,score,source,at').in('player_id',ids).eq('voided',false).limit(5000); obs=data||[]; }
+  const obs=withLocalObs(await squadObs(), ids);
   const byP={}; obs.forEach(o=>(byP[o.player_id]=byP[o.player_id]||[]).push(o));
-  LOCAL_OBS.filter(o=>ids.includes(o.player_id)).forEach(o=>{(byP[o.player_id]=byP[o.player_id]||[]).push(o);});
   const rows=S.players.map(p=>{
     const sc=scoreFromObs(byP[p.id]||[]);
     const vals=Object.values(sc).map(x=>x.score).filter(v=>v!=null);

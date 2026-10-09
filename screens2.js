@@ -123,9 +123,7 @@ VIEWS.match = async function(){
 async function splitAuto(){
   const pool=(presentPlayers().length?presentPlayers():S.players.filter(p=>p.status==='active'));
   const ids=pool.map(p=>p.id);
-  let obs=[];
-  if(ids.length){const {data}=await sb.from('coach_observations').select('player_id,attribute,score,source,at').in('player_id',ids).eq('voided',false).limit(4000);obs=data||[];}
-  LOCAL_OBS.filter(o=>ids.includes(o.player_id)).forEach(o=>obs.push(o));
+  const obs=withLocalObs(await squadObs(), ids).filter(o=>ids.includes(o.player_id));
   const byP={}; obs.forEach(o=>(byP[o.player_id]=byP[o.player_id]||[]).push(o));
   const rated=pool.map(p=>{const sc=scoreFromObs(byP[p.id]||[]);const v=Object.values(sc).map(x=>x.score).filter(Boolean);
     return {p,v:v.length?v.reduce((a,b)=>a+b,0)/v.length:10};}).sort((a,b)=>b.v-a.v);
@@ -173,7 +171,7 @@ function assign(id,side){
 }
 async function beginMatch(){
   const row={team_id:S.team.id,session_id:S.session?.id||null,kind:S.team.league_mode?'internal':'internal',
-    date:today(),split:MATCH.split,halves:2,half_minutes:10};
+    date:today(),split:MATCH.split,halves:2,half_minutes:10,score_a:0,score_b:0};   // full row, so it also works without signal
   const {data,error}=await sb.from('coach_matches').insert(row).select().single();
   if(error) return toast('שגיאה: '+error.message);
   S.match=data; MATCH.clock=0; MATCH.half=1; MATCH.events=[];
@@ -283,7 +281,7 @@ VIEWS.player = async function(pid){
     sb.from('coach_players').select('*').eq('id',pid).maybeSingle()
   ]);
   if(fresh) Object.assign(p,fresh);   // details a parent filled in since the squad was loaded
-  const list=[...(obs||[]),...LOCAL_OBS.filter(o=>o.player_id===pid)];
+  const list=withLocalObs(obs,[pid]);
   const sc=scoreFromObs(list);
   const isGk=p.position==='שוער';
   const attrs=teamAttrs(isGk).filter(a=>isGk?true:a.grp!=='gk');
@@ -465,11 +463,11 @@ VIEWS.reports = async function(){
   screen('דוחות', '<div class="empty">טוען…</div>');
   const ids=S.players.map(p=>p.id);
   const [{data:obs},{data:att},{data:sess}] = await Promise.all([
-    ids.length?sb.from('coach_observations').select('player_id,attribute,score,source,at').in('player_id',ids).eq('voided',false).limit(6000):{data:[]},
+    squadObs().then(data=>({data})),
     sb.from('coach_attendance').select('player_id,present,session_id,coach_sessions!inner(team_id)').eq('coach_sessions.team_id',S.team.id).limit(1500),
     sb.from('coach_sessions').select('id,date,status,focus').eq('team_id',S.team.id).eq('status','done').limit(60)
   ]);
-  const all=[...(obs||[]),...LOCAL_OBS.filter(o=>ids.includes(o.player_id))];
+  const all=withLocalObs(obs,ids);
   const byP={}; all.forEach(o=>(byP[o.player_id]=byP[o.player_id]||[]).push(o));
   const rows=S.players.map(p=>{
     const sc=scoreFromObs(byP[p.id]||[]);
@@ -532,7 +530,9 @@ VIEWS.more = function(){
 };
 function whoAmI(){ const m=S.user?.user_metadata||{}; const e=S.user?.email||'';
   return m.phone ? m.phone.replace(/^\+972/,'0') : /sinai-coach\.app$/.test(e) ? (m.name||'') : e; }
-async function signOut(){ await sb.auth.signOut(); LS('dev',null); location.reload(); }
+async function signOut(){
+  if(OFF.pending() && !confirm(`יש ${OFF.pending()} עדכונים שעוד לא נשלחו (אין קליטה). ביציאה הם יישארו בטאבלט וייצאו בכניסה הבאה. לצאת בכל זאת?`)) return;
+  await sb.auth.signOut(); LS('dev',null); await OFF.clearSaved(); location.reload(); }
 
 VIEWS.discipline = async function(){
   screen('יומן משמעת', '<div class="empty">טוען…</div>');

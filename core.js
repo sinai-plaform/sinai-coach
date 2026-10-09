@@ -9,7 +9,10 @@ if(!window.supabase){
     '<button class="btn primary" style="margin-top:16px" onclick="location.reload()">רענון</button></div>';
   throw new Error('supabase sdk unavailable');
 }
-const sb = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true,autoRefreshToken:true}});
+// every database call goes through OFF.fetch (offline.js), so the app keeps working without signal
+const sb = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true,autoRefreshToken:true},
+  global:{fetch:OFF.fetch}});
+OFF.setAuth(async()=>{ const {data:{session}}=await sb.auth.getSession(); return session?session.access_token:null; });
 const FN = SB_URL+'/functions/v1/coach-auth';
 async function fn(action, payload, withAuth){
   try{
@@ -34,7 +37,7 @@ const S = { user:null, club:null, role:null, teams:[], team:null, players:[], at
 const $=(s,r)=>(r||document).querySelector(s);
 const $$=(s,r)=>[...(r||document).querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const uid=()=>(crypto.randomUUID?crypto.randomUUID():'x'+Date.now()+Math.random().toString(16).slice(2));
+const uid=()=>OFF.uuid();   // a real uuid even on older tablets — the database ids are uuids
 const today=()=>new Date().toLocaleDateString('en-CA');
 const initials=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('');
 const fmtDate=d=>{const x=new Date(d);return x.toLocaleDateString('he-IL',{day:'numeric',month:'short'});};
@@ -44,43 +47,65 @@ let toastT; function toast(m){const t=$('#toast');t.textContent=m;t.classList.ad
 const fmtBirth=d=>{ const [y,m,dd]=String(d).slice(0,10).split('-'); return `${+dd}.${+m}.${y}`; };
 function age(bd){if(!bd)return null;const b=new Date(bd),n=new Date();let a=n.getFullYear()-b.getFullYear();if(n<new Date(n.getFullYear(),b.getMonth(),b.getDate()))a--;return a;}
 
-/* ---------- offline queue ---------- */
-let QUEUE = LS('queue')||[];
-const saveQ=()=>LS('queue',QUEUE);
+/* ---------- writes & sync ----------
+   Writes go straight through sb; offline.js keeps them on the tablet when there is
+   no signal and sends them later. push() stays as the short form the screens use. */
 async function push(table, rows, opts){
   rows = Array.isArray(rows)?rows:[rows];
-  if(!S.online){ QUEUE.push({table,rows,opts:opts||{}}); saveQ(); renderOffline(); return {queued:true}; }
-  try{
-    let q = sb.from(table);
-    const r = opts&&opts.upsert ? await q.upsert(rows,{onConflict:opts.onConflict}).select() : await q.insert(rows).select();
-    if(r.error) throw r.error;
-    return {data:r.data};
-  }catch(e){
-    QUEUE.push({table,rows,opts:opts||{}}); saveQ(); renderOffline();
-    console.warn('queued',table,e.message); return {queued:true};
-  }
+  const q = sb.from(table);
+  const r = opts&&opts.upsert ? await q.upsert(rows,{onConflict:opts.onConflict}) : await q.insert(rows);
+  if(r.error){ console.warn('write failed',table,r.error.message); return {error:r.error}; }
+  return {ok:true};
 }
+// older versions kept their own queue in sc.queue — hand whatever is left in it to the new outbox once
 async function flushQueue(){
-  if(!QUEUE.length||!S.online) return;
-  const left=[];
-  for(const it of QUEUE){
-    try{
-      const q=sb.from(it.table);
-      const r = it.opts.upsert ? await q.upsert(it.rows,{onConflict:it.opts.onConflict}) : await q.insert(it.rows);
-      if(r.error) throw r.error;
-    }catch(e){ left.push(it); }
-  }
-  const n=QUEUE.length-left.length; QUEUE=left; saveQ(); renderOffline();
-  if(n>0) toast(`סונכרנו ${n} רשומות`);
+  const old=LS('queue')||[];
+  if(old.length){ LS('queue',[]); for(const it of old) await push(it.table,it.rows,it.opts); }
+  OFF.flush();
 }
 function renderOffline(){
-  const b=$('#offlineBar');
-  if(!S.online){ b.classList.remove('hide'); b.textContent='אופליין — הנתונים נשמרים במכשיר ויסונכרנו אוטומטית'; }
-  else if(QUEUE.length){ b.classList.remove('hide'); b.style.background='var(--info)'; b.textContent=`ממתינים לסנכרון: ${QUEUE.length}`; }
-  else b.classList.add('hide');
+  const b=$('#offlineBar'); if(!b) return;
+  const n=OFF.pending();
+  b.classList.toggle('hide', S.online && !n);
+  b.style.background = S.online ? 'var(--info)' : '';
+  b.textContent = !S.online
+    ? (n ? `אופליין — ${n} עדכונים שמורים בטאבלט, יישלחו לבד כשתחזור קליטה` : 'אופליין — כל מה שתזין נשמר בטאבלט')
+    : `${n} עדכונים ממתינים — מסנכרן…`;
 }
-addEventListener('online',()=>{S.online=true;renderOffline();flushQueue();});
+OFF.onChange(renderOffline);
+OFF.onSynced(()=>{ if(!OFF.pending()) toast('סונכרן ✓'); });
+addEventListener('online',()=>{S.online=true;renderOffline();flushQueue();warmForField();});
 addEventListener('offline',()=>{S.online=false;renderOffline();});
+
+/* ---------- getting ready for the pitch ----------
+   While there is signal, the next sessions are opened once in the background, so on the
+   pitch they open from the tablet: the session, its drills, attendance and squad ratings. */
+let WARM_AT=0;
+async function warmForField(){
+  if(!navigator.onLine || !S.team || S.role==='parent' || S.role==='player') return;
+  if(Date.now()-WARM_AT<10*60e3) return; WARM_AT=Date.now();
+  try{
+    const to=new Date(Date.now()+3*864e5).toLocaleDateString('en-CA');
+    const {data}=await sb.from('coach_sessions').select('id').eq('team_id',S.team.id).in('status',['planned','live'])
+      .gte('date',new Date(Date.now()-864e5*3).toISOString().slice(0,10)).lte('date',to).order('date').limit(4);
+    for(const s of data||[]) await Promise.all([
+      sb.from('coach_sessions').select('*').eq('id',s.id).single(),
+      sb.from('coach_session_drills').select('*').eq('session_id',s.id).order('ord'),
+      sb.from('coach_attendance').select('*').eq('session_id',s.id)]);
+    await squadObs();
+  }catch(e){}
+}
+// all ratings of the squad — one query shared by the squad screen and the team split, so one saved copy serves both
+async function squadObs(){
+  const ids=S.players.map(p=>p.id); if(!ids.length) return [];
+  const {data}=await sb.from('coach_observations').select('id,player_id,attribute,score,source,at').in('player_id',ids).eq('voided',false).limit(5000);
+  return data||[];
+}
+// server ratings + the ones made on this tablet, each counted once
+function withLocalObs(list, ids){
+  const seen=new Set((list||[]).map(o=>o.id));
+  return (list||[]).concat(LOCAL_OBS.filter(o=>!seen.has(o.id) && (!ids||ids.includes(o.player_id))));
+}
 
 /* ---------- diagrams (same format as the library) ---------- */
 const TEAMC={a:'var(--ta)',b:'var(--tb)',n:'var(--tn)',gk:'var(--tgk)',co:'var(--tco)'};
@@ -198,8 +223,12 @@ async function bootstrap(){
   }
 
   // 2 — an existing session, or a device we already bound
-  let {data:{user}} = await sb.auth.getUser();
-  if(!user){
+  let user = null;
+  if(navigator.onLine){ const r=await sb.auth.getUser(); user=r.data.user;
+    // a weak signal on the pitch is not a logout: fall back to the user saved on the tablet
+    if(!user && r.error && /fetch|network|Failed|abort/i.test(r.error.name+' '+r.error.message)) user=OFF.savedUser(); }
+  else user = OFF.savedUser();
+  if(!user && navigator.onLine){
     const d = LS('dev');
     if(d){
       splash('מחברים אותך…');
@@ -214,6 +243,14 @@ async function bootstrap(){
   // 3 — staff go to the coach app, everyone else to the family app
   const meta = user.user_metadata||{};
   let {data:mem} = await sb.from('coach_members').select('*, coach_clubs(*)').eq('user_id',user.id).in('role',['coach','assistant','manager']);
+  if(!mem){   // no answer at all (not "no club") — never send a coach to the new-club screen because of signal
+    if(navigator.onLine){ bootstrap.tries=(bootstrap.tries||0)+1;
+      if(bootstrap.tries>4){ splash('לא מצליחים להתחבר לשרת. נסו לרענן בעוד רגע.'); return; }
+      splash('החיבור חלש — מנסים שוב…'); setTimeout(bootstrap, 5000); }
+    else { splash('אין קליטה, והאפליקציה עוד לא נפתחה בטאבלט הזה עם אינטרנט. פתחו אותה פעם אחת עם קליטה — מאז היא תעבוד גם בלי.');
+      addEventListener('online',()=>bootstrap(),{once:true}); }
+    return;
+  }
   if(!mem||!mem.length){
     if(meta.coach || meta.role==='coach' || !meta.role){ renderNewClub(); return; }
     S.role = meta.role==='player' ? 'player' : 'parent'; return bootstrapFamily();
@@ -230,6 +267,7 @@ async function bootstrap(){
   $('#nav').classList.remove('hide');
   flushQueue();
   go(LS('view')||'home',null,{replace:true});
+  setTimeout(warmForField, 1500);
 }
 function splash(t){
   $('#nav').classList.add('hide');
@@ -433,8 +471,9 @@ function renderNewClub(){
    so the boot happens after the document finishes loading. */
 function startApp(){
   renderOffline();
+  // keeps the app's own files on the tablet, so it opens on the pitch without signal
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
   bootstrap();
-  setInterval(flushQueue, 30000);
 }
 if(document.readyState==='complete') startApp();
 else addEventListener('load', startApp, {once:true});
