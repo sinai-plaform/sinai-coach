@@ -18,8 +18,10 @@ async function bootstrapFamily(){
     const {data:g} = await sb.from('coach_guardians').select('*').eq('user_id',S.user.id).limit(1).maybeSingle();
     FAM.guardian = g;
   }
-  const {data:pl} = await sb.from('coach_players').select('*');
-  FAM.kids = pl || [];
+  const [{data:pl},{data:at}] = await Promise.all([
+    sb.from('coach_players').select('*'),
+    sb.from('coach_attributes').select('*').order('sort')]);   // the Hebrew names of the attributes
+  FAM.kids = pl || []; S.attrs = at || [];
   if(FAM.guardian){
     const {data:c} = await sb.from('coach_clubs').select('id,name,player_login_min_grade')
       .eq('id',FAM.guardian.club_id).maybeSingle();
