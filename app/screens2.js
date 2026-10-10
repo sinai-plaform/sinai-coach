@@ -321,15 +321,25 @@ VIEWS.player = async function(pid){
         ${p.coach_note?`<div class="alert ok">📝 ${esc(p.coach_note)}</div>`:''}
       </div>${p.details_updated_at?`<p class="xs muted" style="margin-top:6px">עודכן ${fmtDate(p.details_updated_at)}</p>`:''}</div>`:''}
 
-    ${vals.length?`<div class="card" style="margin-top:10px">${radar(attrs,sc)}</div>`:''}
+    <div class="hd"><h2>תכונות</h2><span class="xs muted">סולם 1–20</span></div>
+    <div class="card fmcard">
+      <div class="fm">${['tech','mental','phys','gk'].filter(g=>grps[g]).map(g=>`<div class="fmcol">
+        <h4>${GRP_LABEL[g]||g}</h4>
+        ${grps[g].map(a=>{const s=sc[a.key]; const v=s&&s.score!=null?Math.round(s.score):null;
+          return `<div class="fmr ${!s||s.conf==='none'||s.conf==='low'?'dim':''}"><span>${esc(a.label)}</span>
+            <span class="fmv ${v==null?'':v>=16?'v4':v>=11?'v3':v>=6?'v2':'v1'}">${v==null?'–':showNum?v:'●'}</span>
+            <span class="fmt">${trIcon(s&&s.trend)}</span></div>`;}).join('')}
+      </div>`).join('')}</div>
+      <div class="fmside">
+        <div><span class="xs muted">עמדה</span><b>${esc(p.position||'—')}</b></div>
+        <div><span class="xs muted">רגל מועדפת</span><b>${({right:'ימין',left:'שמאל',both:'שתיהן'})[p.preferred_foot]||'—'}</b></div>
+        <div><span class="xs muted">רגל חלשה</span><b class="fmstars" aria-label="${p.weak_foot||0} מתוך 5">${p.weak_foot?'★'.repeat(p.weak_foot)+'<i>'+'★'.repeat(5-p.weak_foot)+'</i>':'—'}</b></div>
+        <div><span class="xs muted">גיל</span><b>${age(p.birth_date)??'—'}</b></div>
+      </div>
+      <p class="xs muted" style="margin-top:10px">ערכים בהירים = מעט תצפיות עדיין. ▲▼ = מגמה בחודש האחרון לעומת קודם.</p>
+    </div>
 
-    ${Object.entries(grps).map(([g,list2])=>`
-      <div class="hd"><h2>${GRP_LABEL[g]||g}</h2></div>
-      <div class="card">${list2.map(a=>{const s=sc[a.key];
-        if(!s) return `<div class="attr dim"><span>${esc(a.label)}</span><div class="bar"></div><span class="v">—</span><span class="tr"></span></div>`;
-        return `<div class="attr ${s.conf==='none'||s.conf==='low'?'dim':''}"><span>${esc(a.label)}</span>${bar(s.score)}
-          <span class="v num">${showNum?s.score:''}</span><span class="tr">${trIcon(s.trend)}</span></div>`;}).join('')}
-      </div>`).join('')}
+    ${vals.length?`<div class="card" style="margin-top:10px">${radar(attrs,sc)}</div>`:''}
 
     <div class="hd"><h2>יעד אישי</h2><button class="btn sm" onclick="goalForm('${pid}')">+</button></div>
     ${(goals||[]).length?`<div class="stack">${goals.map(g=>`<div class="prow"><div class="pname"><b class="sm">${esc(g.text)}</b>
@@ -416,11 +426,12 @@ function parentMsg(pid){
 /* ---------- TESTS ---------- */
 let TIMERS={};
 VIEWS.tests = function(){
-  const protos=[{k:'ספרינט 20 מ׳',u:'sec',d:20},{k:'ספרינט 10 מ׳',u:'sec',d:10},{k:'זריזות 5-10-5',u:'sec',d:20},
-    {k:'קפיצה למרחק',u:'cm'},{k:'הקפצות ב-60 שנ׳',u:'reps'},{k:'מסירות לקיר ב-30 שנ׳',u:'reps'}];
+  // each test feeds the attribute it measures
+  const protos=[{k:'ספרינט 20 מ׳',u:'sec',d:20,a:'speed'},{k:'ספרינט 10 מ׳',u:'sec',d:10,a:'speed'},{k:'זריזות 5-10-5',u:'sec',d:20,a:'agility'},
+    {k:'קפיצה למרחק',u:'cm',a:'strength'},{k:'הקפצות ב-60 שנ׳',u:'reps',a:'first_touch'},{k:'מסירות לקיר ב-30 שנ׳',u:'reps',a:'passing'}];
   screen('מדידות', `
     <div class="card stack">
-      <label class="f">מבחן<select id="tp">${protos.map(p=>`<option value="${esc(p.k)}" data-u="${p.u}" data-d="${p.d||''}">${esc(p.k)}</option>`).join('')}</select></label>
+      <label class="f">מבחן<select id="tp">${protos.map(p=>`<option value="${esc(p.k)}" data-u="${p.u}" data-d="${p.d||''}" data-a="${p.a}">${esc(p.k)}</option>`).join('')}</select></label>
       <label class="f">מרחק (מ׳) — אם רלוונטי<input id="td" type="number" class="num" value="20"></label>
       <p class="xs muted">לחיצה על שחקן מתחילה ספירה; לחיצה שנייה עוצרת. במצב קבוצתי לוחצים "התחל לכולם" ואז מקישים על כל שחקן כשהוא חוצה.</p>
       <div class="row" style="gap:8px"><button class="btn" style="flex:1" id="grpStart">התחל לכולם</button>
@@ -452,7 +463,18 @@ VIEWS.tests = function(){
     const rows=Object.entries(TIMERS).filter(([,v])=>v.done).map(([pid,v])=>({player_id:pid,test,value:+v.val.toFixed(2),unit,distance_m:dist}));
     if(!rows.length) return toast('אין תוצאות');
     await push('coach_tests',rows);
-    for(const r of rows){ const norm=Math.max(1,Math.min(5,Math.round(6-((r.value-3)/0.6)))); await addObs(r.player_id,'speed',norm,{source:'test'}); }
+    // scored against the rest of the group, so the same test is fair at every age
+    let attr=sel.selectedOptions[0].dataset.a||'speed';
+    const allowed=teamAttrs(false).map(a=>a.key);
+    if(!allowed.includes(attr)) attr = attr==='first_touch'?'ball_control' : attr==='agility'||attr==='speed'?'coordination' : attr;
+    const lowerBetter = unit==='sec';
+    const sorted=[...rows].sort((a,b)=>lowerBetter?a.value-b.value:b.value-a.value);
+    for(const r of rows){
+      let norm;
+      if(sorted.length>=4){ const rank=sorted.indexOf(r)/(sorted.length-1); norm=Math.round(5-rank*4); }
+      else norm = lowerBetter&&r.distance_m ? Math.max(1,Math.min(5,Math.round(6-((r.value/r.distance_m*20-3)/0.6)))) : 3;
+      if(allowed.includes(attr)) await addObs(r.player_id,attr,norm,{source:'test',note:test+': '+r.value});
+    }
     TIMERS={}; draw(); toast(`נשמרו ${rows.length} מדידות`);
   };
   draw();

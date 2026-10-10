@@ -30,6 +30,20 @@ const THEME_SEQ = {
   d:['possession','buildup','press','review','lines','transition','finish','review','switch','1v1','touch','review']
 };
 const themeBy=k=>THEMES.find(t=>t.k===k);
+/* what each theme develops — the attributes a focus block measures */
+const THEME_ATTRS = {
+  ball:['ball_control','coordination'], dribble_a:['ball_control','coordination'], pass_a:['ball_control','listening'], shoot_a:['ball_control','courage'],
+  touch:['first_touch','passing'], pass:['passing','decisions'], '1v1':['dribbling','determination'], finish:['shooting','first_touch'],
+  possession:['passing','first_touch','decisions'], switch:['long_pass','decisions'], buildup:['passing','decisions'], lines:['decisions','passing'],
+  press:['determination','stamina','teamwork'], transition:['speed','decisions'], review:['teamwork','decisions']
+};
+/* a focus block: one theme for several weeks, in the classic teaching progression */
+const BLOCK_PHASES = ['הקניה','תרגול','יישום במשחק','מבחן במשחק'];
+function blockPhase(week, weeks){
+  if(weeks<=1) return 2;
+  if(week===weeks && weeks>=3) return 3;
+  return Math.min(2, Math.floor((week-1)*3/(weeks-(weeks>=3?1:0))));
+}
 
 /* session skeleton per age: [slot, share of the session, categories] */
 const SLOTS = {
@@ -73,15 +87,24 @@ function pickDrill(cats, theme, age, used, inSession, phaseIdx, rand){
   return best;
 }
 
-function buildSession(theme, age, minutes, phaseIdx, used, rand){
+function buildSession(theme, age, minutes, phaseIdx, used, rand, maint, block){
   const slots=SLOTS[age]||SLOTS.b;
   const mins=splitMinutes(minutes, slots.map(s=>s[1]));
   const inS=new Set(), items=[];
   slots.forEach(([label,,cats],i)=>{
     let c = cats==='THEME' ? theme.cats : cats==='THEME2' ? [...theme.cats].reverse().concat(['ssg']) : cats;
+    let th = (cats==='THEME'||cats==='THEME2') ? theme : null;
+    if(block!=null){
+      // early weeks: more volume on the focus, less opposition; later: game-realistic, then a test game
+      if(cats==='THEME2' && block<=1) c=theme.cats;
+      if(cats==='THEME2' && block>=2) c=['ssg','pos',...theme.cats];
+      if(cats==='THEME' && block>=2) c=[...theme.cats.filter(x=>x!=='tech'),'pos','ssg'];
+      // the technique / rondo slot keeps the other skills alive
+      if(maint && Array.isArray(cats) && (cats.includes('rondo')||cats.includes('tech')||cats.includes('play'))) th=maint;
+    }
     // FIFA 11+ style prevention warm-up at the start of every week
     if(label==='הפעלה' && phaseIdx===0) c=['phys','warm'];
-    const d=pickDrill(c, (cats==='THEME'||cats==='THEME2')?theme:null, age, used, inS, phaseIdx, rand);
+    const d=pickDrill(c, th, age, used, inS, phaseIdx, rand);
     if(!d) return;
     inS.add(d.id); used[d.id]=used.__n;
     items.push({id:d.id, min:mins[i], slot:label});
@@ -118,7 +141,7 @@ VIEWS.program = async function(){
   const row=s=>`<div class="prow" onclick="go('plan',{session:'${s.id}'})">
       <div class="av" style="font-size:12px">${WD[new Date(s.date+'T12:00:00').getDay()]}</div>
       <div class="pname"><b>${esc(s.focus||s.theme||'אימון')}</b>
-        <span class="xs muted">${new Date(s.date+'T12:00:00').getDate()}.${new Date(s.date+'T12:00:00').getMonth()+1}${s.start_time?' · '+String(s.start_time).slice(0,5):''} · ${s.planned_minutes||''} דק׳${s.phase?' · '+esc(s.phase):''}</span></div>
+        <span class="xs muted">${new Date(s.date+'T12:00:00').getDate()}.${new Date(s.date+'T12:00:00').getMonth()+1}${s.start_time?' · '+String(s.start_time).slice(0,5):''} · ${s.planned_minutes||''} דק׳${s.phase&&!String(s.focus||'').includes(s.phase)?' · '+esc(s.phase):''}</span></div>
       ${s.status==='live'?'<span class="pill ok">פעיל</span>':s.date===today()?`<button class="btn sm primary" onclick="event.stopPropagation();openSession('${s.id}')">התחל</button>`:'<span class="pill">מתוכנן</span>'}</div>`;
   $('#pg').innerHTML=`
     <div class="card stack">
@@ -141,40 +164,68 @@ VIEWS.program = async function(){
 };
 
 /* ---------- auto-build sheet ---------- */
-function autoPlanSheet(){
+function autoPlanSheet(mode){
+  mode = mode || 'season';
   const age=S.team.age_profile||'b';
   const seq=(THEME_SEQ[age]||THEME_SEQ.b).slice();
-  const nextSun=(()=>{const d=new Date();d.setDate(d.getDate()+((7-d.getDay())%7||7));return d.toLocaleDateString('en-CA');})();
+  const ageThemes=THEMES.filter(t=>t.ages.includes(age) && t.k!=='review');
+  let focus=ageThemes[0].k;
   let days=[0,3];
+  const focusMode = mode==='focus';
   sheet(`<h2>בניית תוכנית אוטומטית</h2>
-    <p class="xs muted" style="margin:4px 0 12px">כל שבוע מקבל נושא. בכל אימון: הפעלה → פיתוח הנושא → יישום → משחק → סיכום, עם רוטציה של תרגילים כדי שלא יחזרו מהר. אפשר לערוך כל אימון אחר כך.</p>
+    <div class="chips" style="margin:10px 0 6px">
+      <button class="chip ${focusMode?'':'on'}" onclick="autoPlanSheet('season')">עונתית · נושא לכל שבוע</button>
+      <button class="chip ${focusMode?'on':''}" onclick="autoPlanSheet('focus')">ממוקדת · נושא אחד לתקופה</button>
+    </div>
+    <p class="xs muted" style="margin:4px 0 12px">${focusMode
+      ? 'בוחרים על מה לעבוד בתקופה הקרובה, והתוכנית בנויה בשלבים: הקניה → תרגול → יישום במשחק → מבחן במשחק. נושא אחר נשמר בכל אימון ברונדו או בטכניקה, כדי שהיכולות האחרות לא יירדו.'
+      : 'כל שבוע מקבל נושא. בכל אימון: הפעלה → פיתוח הנושא → יישום → משחק → סיכום, עם רוטציה של תרגילים כדי שלא יחזרו מהר.'} אפשר לערוך כל אימון אחר כך.</p>
     <div class="stack">
+      ${focusMode?`<label class="f">על מה עובדים בתקופה הזו?<select id="apF">${ageThemes.map(t=>`<option value="${t.k}">${esc(t.label)}</option>`).join('')}</select></label>
+        <p class="xs muted" id="apFa"></p>`:''}
       <div class="grid2">
         <label class="f">מתחילים ב-<input id="apS" type="date" value="${today()}"></label>
-        <label class="f">שבועות<select id="apW">${[4,6,8,10,12,16].map(n=>`<option ${n===8?'selected':''}>${n}</option>`).join('')}</select></label>
+        <label class="f">שבועות<select id="apW">${(focusMode?[2,3,4,5,6,8]:[4,6,8,10,12,16]).map(n=>`<option ${n===(focusMode?4:8)?'selected':''}>${n}</option>`).join('')}</select></label>
       </div>
       <label class="f">ימי אימון<div class="chips" id="apD">${WD.map((w,i)=>`<button type="button" class="chip ${days.includes(i)?'on':''}" data-d="${i}">${w}</button>`).join('')}</div></label>
       <div class="grid2">
         <label class="f">שעה<input id="apT" type="time" value="16:00"></label>
         <label class="f">אורך (דק׳)<input id="apM" type="number" class="num" value="${S.team.session_minutes||60}"></label>
       </div>
-      <label class="f">רצף הנושאים (גוררים בלחיצה ↑)<div class="stack" id="apSeq"></div></label>
+      <label class="f">${focusMode?'נושאים לשמירה (מתחלפים בין האימונים)':'רצף הנושאים (גוררים בלחיצה ↑)'}<div class="stack" id="apSeq"></div></label>
       <label class="f">הוספת נושא<select id="apAdd"><option value="">—</option>${THEMES.filter(t=>t.ages.includes(age)).map(t=>`<option value="${t.k}">${esc(t.label)}</option>`).join('')}</select></label>
-      <label class="f">שם התוכנית<input id="apN" value="תוכנית ${AGES[age]||''} · ${new Date().toLocaleDateString('he-IL',{month:'long'})}"></label>
+      <label class="f">שם התוכנית<input id="apN" value=""></label>
+      <div class="card" id="apPrev" style="padding:10px 12px"></div>
       <p class="xs muted" id="apInfo"></p>
       <button class="btn primary big" id="apGo">בנה תוכנית</button>
     </div>`);
+  const nameFor=()=> focusMode ? `${themeBy(focus)?.label||''} · ${$('#apW').value} שבועות` : `תוכנית ${AGES[age]||''} · ${new Date().toLocaleDateString('he-IL',{month:'long'})}`;
+  let nameTouched=false; $('#apN').value=nameFor(); $('#apN').oninput=()=>nameTouched=true;
+  const maintList=()=>seq.filter(k=>k!==focus);
   const drawSeq=()=>{
-    $('#apSeq').innerHTML=seq.map((k,i)=>`<div class="prow" style="padding:6px 9px"><div class="av" style="width:28px;height:28px">${i+1}</div>
+    const list = focusMode ? maintList() : seq;
+    $('#apSeq').innerHTML=list.map((k,i)=>`<div class="prow" style="padding:6px 9px"><div class="av" style="width:28px;height:28px">${i+1}</div>
       <div class="pname"><b class="sm">${esc(themeBy(k)?.label||k)}</b></div>
-      <button class="btn sm ghost" onclick="apMove(${i})">↑</button><button class="btn sm ghost" onclick="apDel(${i})">✕</button></div>`).join('');
+      ${focusMode?'':`<button class="btn sm ghost" onclick="apMove(${i})">↑</button>`}<button class="btn sm ghost" onclick="apDel('${k}',${i})">✕</button></div>`).join('');
     info();
   };
   const info=()=>{ const w=+$('#apW').value; const n=planDates($('#apS').value,w,days).length;
-    $('#apInfo').textContent=`${n} אימונים · ${w} שבועות · הנושאים חוזרים במחזוריות אם יש יותר שבועות מנושאים`; };
+    if(!nameTouched) $('#apN').value=nameFor();
+    if(focusMode){
+      const at=(THEME_ATTRS[focus]||[]).map(k=>ATTR_LABEL(k)).join(', ');
+      $('#apFa').textContent = at ? 'משפיע בעיקר על: '+at : '';
+      $('#apPrev').innerHTML = `<p class="xs muted" style="margin-bottom:6px">השלבים</p>`+
+        Array.from({length:w},(_,i)=>`<div class="spread sm" style="padding:3px 0"><span>שבוע ${i+1}</span><span class="pill ${blockPhase(i+1,w)===3?'ok':blockPhase(i+1,w)===2?'info':''}">${BLOCK_PHASES[blockPhase(i+1,w)]}</span></div>`).join('');
+      $('#apInfo').textContent=`${n} אימונים · ${w} שבועות · בשבוע האחרון משחק מבחן וסבב מהיר על ${at||'הנושא'}, כדי לראות את ההתקדמות בכרטיסי השחקנים`;
+    } else {
+      $('#apPrev').classList.add('hide');
+      $('#apInfo').textContent=`${n} אימונים · ${w} שבועות · הנושאים חוזרים במחזוריות אם יש יותר שבועות מנושאים`;
+    }
+  };
   window.apMove=i=>{ if(!i) return; [seq[i-1],seq[i]]=[seq[i],seq[i-1]]; drawSeq(); };
-  window.apDel=i=>{ if(seq.length<2) return; seq.splice(i,1); drawSeq(); };
+  window.apDel=(k,i)=>{ const at=seq.indexOf(k); if(seq.length<2 || at<0) return; seq.splice(at,1); drawSeq(); };
   $('#apAdd').onchange=e=>{ if(e.target.value){ seq.push(e.target.value); e.target.value=''; drawSeq(); } };
+  if(focusMode) $('#apF').onchange=e=>{ focus=e.target.value; drawSeq(); };
   $('#apD').onclick=e=>{ const b=e.target.closest('[data-d]'); if(!b) return; const d=+b.dataset.d;
     days=days.includes(d)?days.filter(x=>x!==d):[...days,d].sort(); b.classList.toggle('on'); info(); };
   $('#apW').onchange=info; $('#apS').onchange=info;
@@ -183,7 +234,8 @@ function autoPlanSheet(){
     if(!days.length) return toast('בחרו ימי אימון');
     $('#apGo').disabled=true; $('#apGo').textContent='בונה…';
     try{ await generateProgram({start:$('#apS').value, weeks:+$('#apW').value, days, time:$('#apT').value||null,
-      minutes:+$('#apM').value||60, seq, name:$('#apN').value.trim()||'תוכנית אימונים'}); }
+      minutes:+$('#apM').value||60, seq: focusMode?[focus]:seq, focus: focusMode?focus:null, maint: focusMode?maintList():null,
+      name:$('#apN').value.trim()||'תוכנית אימונים'}); }
     catch(e){ toast('שגיאה: '+(e.message||e)); $('#apGo').disabled=false; $('#apGo').textContent='בנה תוכנית'; }
   };
 }
@@ -197,19 +249,32 @@ async function generateProgram(o){
     .eq('coach_sessions.team_id',S.team.id).gte('coach_sessions.date',new Date(Date.now()-864e5*30).toLocaleDateString('en-CA'));
   const used={__n:10}; (recentSd||[]).forEach(r=>used[r.drill_id]=5);
   const rand=rng(o.start.replace(/\D/g,'')*1 + o.weeks*7 + o.minutes);
-  const cycle={id:uid(),team_id:S.team.id,name:o.name,start_date:o.start,weeks:o.weeks,weekdays:o.days,start_time:o.time,themes:o.seq};
+  const cycle={id:uid(),team_id:S.team.id,name:o.name,start_date:o.start,weeks:o.weeks,weekdays:o.days,start_time:o.time,
+    themes: o.focus ? {focus:o.focus, maint:o.maint||[]} : o.seq};
+  let nMaint=0;
   const c1=await sb.from('coach_cycles').insert(cycle); if(c1.error) throw c1.error;
   const sessions=[], drills=[];
   const perWeek={};
   dates.forEach(({date,week})=>{
-    const theme=themeBy(o.seq[(week-1)%o.seq.length])||THEMES[0];
+    const theme=themeBy(o.focus || o.seq[(week-1)%o.seq.length])||THEMES[0];
     const idx=perWeek[week]=(perWeek[week]??-1)+1;
     const nInWeek=dates.filter(d=>d.week===week).length;
-    const phaseIdx = nInWeek===1 ? 1 : Math.min(2, Math.round(idx*2/(nInWeek-1)));
-    const items=buildSession(theme, age, o.minutes, phaseIdx, used, rand);
+    let phaseIdx = nInWeek===1 ? 1 : Math.min(2, Math.round(idx*2/(nInWeek-1)));
+    let block=null, maint=null, phaseLabel=PHASES[phaseIdx];
+    if(o.focus){
+      block=blockPhase(week,o.weeks); phaseLabel=BLOCK_PHASES[block];
+      phaseIdx=[0,1,2,2][block];
+      const ml=(o.maint||[]).filter(k=>themeBy(k)&&themeBy(k).ages.includes(age));
+      maint = ml.length ? themeBy(ml[(nMaint++)%ml.length]) : null;
+    }
+    const items=buildSession(theme, age, o.minutes, phaseIdx, used, rand, maint, block);
     const id=uid();
+    const measure = block===3 ? (THEME_ATTRS[theme.k]||[]).map(k=>ATTR_LABEL(k)).join(', ') : '';
     sessions.push({id,team_id:S.team.id,cycle_id:cycle.id,date,start_time:o.time,status:'planned',
-      theme:theme.label,week_no:week,phase:PHASES[phaseIdx],focus:theme.label,
+      theme:theme.label,week_no:week,phase:phaseLabel,
+      focus: o.focus ? `${theme.label} · ${phaseLabel}` : theme.label,
+      notes: o.focus ? (block===3 ? `שבוע מבחן: במשחק, סבב מהיר על ${measure} — ההשוואה לתחילת התקופה תופיע בכרטיסי השחקנים.`
+                       : `שבוע ${week} מתוך ${o.weeks} בתוכנית "${o.name}"${maint?` · נושא לשמירה: ${maint.label}`:''}`) : null,
       planned_minutes:items.reduce((s,i)=>s+i.min,0)});
     items.forEach((it,i)=>drills.push({session_id:id,drill_id:it.id,ord:i,minutes:it.min,notes:null}));
   });
@@ -223,7 +288,9 @@ async function cycleSheet(id){
   const {count}=await sb.from('coach_sessions').select('id',{count:'exact',head:true}).eq('cycle_id',id).eq('status','planned');
   sheet(`<h2>${esc(c.name)}</h2>
     <p class="xs muted" style="margin:4px 0 10px">מ-${fmtDate(c.start_date)} · ${c.weeks} שבועות · ימים ${(c.weekdays||[]).map(d=>WD[d]).join(', ')} · ${count||0} אימונים שעוד לא בוצעו</p>
-    <div class="chips" style="margin-bottom:12px">${(c.themes||[]).map((k,i)=>`<span class="chip">${i+1}. ${esc(themeBy(k)?.label||k)}</span>`).join('')}</div>
+    <div class="chips" style="margin-bottom:12px">${Array.isArray(c.themes)
+      ? c.themes.map((k,i)=>`<span class="chip">${i+1}. ${esc(themeBy(k)?.label||k)}</span>`).join('')
+      : `<span class="chip on">מיקוד: ${esc(themeBy(c.themes?.focus)?.label||'')}</span>${(c.themes?.maint||[]).map(k=>`<span class="chip">${esc(themeBy(k)?.label||k)}</span>`).join('')}`}</div>
     <button class="btn danger" style="width:100%" id="cyDel">מחיקת האימונים שעוד לא בוצעו</button>
     <p class="xs muted" style="margin-top:8px">אימונים שכבר בוצעו נשארים בהיסטוריה.</p>`);
   $('#cyDel').onclick=async()=>{

@@ -96,9 +96,13 @@ function playerForm(p){
     <label class="f">שם מלא<input id="pn" value="${esc(p.name||'')}"></label>
     <div class="grid2">
       <label class="f">מספר<input id="pno" type="number" class="num" value="${p.shirt_no||''}"></label>
-      <label class="f">עמדה<select id="ppos">${['','שוער','מגן','קשר','חלוץ'].map(x=>`<option ${x===p.position?'selected':''}>${x}</option>`).join('')}</select></label>
+      <label class="f">עמדה<select id="ppos">${['','שוער','בלם','מגן','קשר אחורי','קשר','קשר התקפי','כנף','חלוץ'].concat(p.position&&!['','שוער','בלם','מגן','קשר אחורי','קשר','קשר התקפי','כנף','חלוץ'].includes(p.position)?[p.position]:[]).map(x=>`<option ${x===p.position?'selected':''}>${x}</option>`).join('')}</select></label>
     </div>
     <label class="f">תאריך לידה<input id="pbd" type="date" value="${p.birth_date||''}"></label>
+    <div class="grid2">
+      <label class="f">רגל מועדפת<select id="pft">${[['','—'],['right','ימין'],['left','שמאל'],['both','שתיהן']].map(([v,l])=>`<option value="${v}" ${v===(p.preferred_foot||'')?'selected':''}>${l}</option>`).join('')}</select></label>
+      <label class="f">רגל חלשה (1–5)<select id="pwf">${['','1','2','3','4','5'].map(v=>`<option value="${v}" ${v===String(p.weak_foot||'')?'selected':''}>${v||'—'}</option>`).join('')}</select></label>
+    </div>
     <div class="grid2">
       <label class="f">שם הורה<input id="pgn" value="${esc(p.parent_name||'')}"></label>
       <label class="f">טלפון הורה<input id="pgp" type="tel" inputmode="tel" value="${esc(p.parent_phone||'')}"></label>
@@ -112,7 +116,8 @@ function playerForm(p){
     const name=$('#pn').value.trim(); if(!name) return toast('חסר שם');
     const row={name, shirt_no:+$('#pno').value||null, position:$('#ppos').value||null, birth_date:$('#pbd').value||null,
       parent_name:$('#pgn').value.trim()||null, parent_phone:$('#pgp').value.trim()||null,
-      status:$('#pst').value, status_until:$('#psu').value||null};
+      status:$('#pst').value, status_until:$('#psu').value||null,
+      preferred_foot:$('#pft').value||null, weak_foot:+$('#pwf').value||null};
     if(p.id){ await sb.from('coach_players').update(row).eq('id',p.id); }
     else{
       row.club_id=S.club.id;
@@ -175,7 +180,7 @@ async function loadPlanSession(id){
     sb.from('coach_session_drills').select('*').eq('session_id',id).order('ord')]);
   if(!s) return false;
   PLAN={sessionId:id,status:s.status,date:s.date,time:s.start_time?String(s.start_time).slice(0,5):'',
-    focus:s.focus||'',theme:s.theme||'',phase:s.phase||'',week:s.week_no,
+    focus:s.focus||'',theme:s.theme||'',phase:s.phase||'',week:s.week_no,snote:s.notes||'',
     items:(sd||[]).map(x=>({id:x.drill_id,min:x.minutes,notes:x.notes||''}))};
   LS('plan',PLAN); return true;
 }
@@ -191,6 +196,7 @@ VIEWS.plan = async function(arg){
     <div class="card stack">
       ${PLAN.theme?`<div class="row wrap" style="gap:6px"><span class="pill info">${esc(PLAN.theme)}</span>
         ${PLAN.week?`<span class="pill">שבוע ${PLAN.week}</span>`:''}${PLAN.phase?`<span class="pill">${esc(PLAN.phase)}</span>`:''}</div>`:''}
+      ${PLAN.snote?`<p class="xs muted">${esc(PLAN.snote)}</p>`:''}
       <div class="grid2">
         <label class="f">תאריך<input id="pdt" type="date" value="${PLAN.date||today()}" ${done?'disabled':''}></label>
         <label class="f">שעה<input id="ptm" type="time" value="${PLAN.time||''}" ${done?'disabled':''}></label>
@@ -460,20 +466,45 @@ async function applyTag(pid,i){
   closeSheet(); drawTiles(); if(S.match)drawMatchTiles();
   toast(t.t);
 }
+/* what a drill category trains — a quick round rates exactly that */
+const CAT_ATTRS = {
+  warm:['coordination','agility','listening'], phys:['speed','agility','stamina','coordination'],
+  play:['ball_control','coordination','courage'], tech:['first_touch','dribbling','ball_control','passing'],
+  rondo:['passing','first_touch','decisions'], pos:['decisions','passing','teamwork'],
+  fin:['shooting','first_touch','courage'], trans:['speed','decisions','determination'],
+  ssg:['decisions','teamwork','determination'], gk:['gk_handling','gk_positioning'], cool:['listening','teamwork']
+};
+function drillAttrs(){
+  const it=S.sessionDrills[LIVE.idx]; const d=it&&drillById(it.id);
+  const allowed=teamAttrs(false).map(a=>a.key);
+  let keys=(d&&CAT_ATTRS[d.cat]||[]).filter(k=>allowed.includes(k));
+  if(PLAN_THEME_ATTRS().length) keys=[...new Set([...PLAN_THEME_ATTRS().filter(k=>allowed.includes(k)),...keys])];
+  if(!keys.length) keys=allowed.slice(0,2);
+  return keys.slice(0,2);
+}
+// the session's theme (from a program) leads the quick round
+function PLAN_THEME_ATTRS(){
+  const th=(typeof THEMES!=='undefined')&&S.session&&THEMES.find(t=>t.label===S.session.theme);
+  return th&&typeof THEME_ATTRS!=='undefined'?(THEME_ATTRS[th.k]||[]):[];
+}
 function quickRound(){
   const pl=presentPlayers().length?presentPlayers():S.players;
-  let i=0;
+  const keys=drillAttrs();
+  let i=0, got={};
   const step=()=>{
     if(i>=pl.length){closeSheet();toast('סבב הושלם');drawTiles();return;}
-    const p=pl[i];
-    const key=(teamAttrs(false)[0]||{key:'decisions'}).key;
-    const focus=S.sessionDrills[LIVE.idx]?.focus_attributes?.[0] || key;
-    sheet(`<p class="xs muted">סבב מהיר ${i+1}/${pl.length}</p><h2>${esc(p.name)}</h2>
-      <p class="sm muted" style="margin:6px 0 10px">${esc(ATTR_LABEL(focus))}</p>
-      <div class="scorerow">${[1,2,3,4,5].map(v=>`<button data-s="${v}" onclick="qrScore('${p.id}','${focus}',${v})">${v}</button>`).join('')}</div>
-      <button class="btn ghost" style="width:100%;margin-top:10px" onclick="qrSkip()">דלג</button>`);
+    const p=pl[i]; got={};
+    sheet(`<p class="xs muted">סבב מהיר ${i+1}/${pl.length} · מה שהתרגיל הזה מאמן</p><h2>${esc(p.name)}</h2>
+      ${keys.map(k=>`<p class="sm muted" style="margin:10px 0 6px">${esc(ATTR_LABEL(k))}</p>
+      <div class="scorerow" data-k="${k}">${[1,2,3,4,5].map(v=>`<button data-s="${v}" onclick="qrScore('${p.id}','${k}',${v},this)">${v}</button>`).join('')}</div>`).join('')}
+      <button class="btn ghost" style="width:100%;margin-top:10px" onclick="qrSkip()">${keys.length>1?'הבא':'דלג'}</button>`);
   };
-  window.qrScore=async(pid,k,v)=>{await addObs(pid,k,v,{drill_id:S.sessionDrills[LIVE.idx]?.id});i++;step();drawTiles();};
+  window.qrScore=async(pid,k,v,btn)=>{
+    btn.parentElement.querySelectorAll('button').forEach(b=>b.style.outline='');
+    btn.style.outline='2px solid var(--accent)';
+    got[k]=v; await addObs(pid,k,v,{drill_id:S.sessionDrills[LIVE.idx]?.id});
+    if(keys.every(x=>got[x]!=null)){ i++; setTimeout(step,150); drawTiles(); }
+  };
   window.qrSkip=()=>{i++;step();};
   step();
 }

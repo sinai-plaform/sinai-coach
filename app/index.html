@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <meta name="theme-color" content="#1E45B0">
-<meta name="app-version" content="2.2.0">
+<meta name="app-version" content="2.3.0">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -173,6 +173,19 @@ label.f{display:grid;gap:5px;font-size:13px;color:var(--muted)}
 .attr .v{font-weight:700;min-width:28px;text-align:end}
 .attr .tr{width:16px;text-align:center;font-size:12px}
 .attr.dim{opacity:.5}
+/* FM-style attribute sheet */
+.fm{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 18px}
+.fmcol h4{margin:4px 0 6px;font-size:12px;letter-spacing:.06em;color:var(--accent);font-weight:700}
+.fmr{display:grid;grid-template-columns:1fr auto 14px;align-items:center;gap:6px;padding:5px 8px;border-radius:7px;font-size:14px}
+.fmcol .fmr:nth-of-type(odd){background:var(--surface2)}
+.fmr.dim span:first-child{color:var(--muted)} .fmr.dim .fmv{opacity:.55}
+.fmv{font-weight:700;min-width:24px;text-align:center;font-variant-numeric:tabular-nums}
+.fmv.v1{color:var(--bad)} .fmv.v2{color:var(--warn)} .fmv.v3{color:var(--ink)} .fmv.v4{color:var(--ok)}
+.fmt{font-size:11px;text-align:center}
+.fmside{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.fmside div{display:flex;flex-direction:column;gap:2px}.fmside b{font-weight:600;font-size:14px}
+.fmstars{color:var(--accent);letter-spacing:1px}.fmstars i{font-style:normal;color:var(--line)}
+@media (max-width:420px){.fmside{grid-template-columns:repeat(2,1fr)}}
 .bar{height:7px;background:var(--surface2);border-radius:99px;overflow:hidden}
 .bar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
 
@@ -212,15 +225,15 @@ table.tbl th{color:var(--muted);font-weight:500;font-size:12.5px}
 <script src="drills.js?v=588a5ba0"></script>
 <script src="config.js?v=b8a874fc"></script>
 <script src="offline.js?v=9837fcec"></script>
-<script src="core.js?v=12ac2dd5"></script>
+<script src="core.js?v=c64839bb"></script>
 <script src="rules.js?v=9e86f482"></script>
-<script src="screens.js?v=503eecff"></script>
-<script src="screens2.js?v=2a709946"></script>
+<script src="screens.js?v=167f23a8"></script>
+<script src="screens2.js?v=1fa5ee7a"></script>
 <script src="roster.js?v=7f893537"></script>
 <script src="family.js?v=795633b2"></script>
 <script src="board.js?v=2cb537f6"></script>
 <script src="anim.js?v=225911c5"></script>
-<script src="program.js?v=fb918743"></script>
+<script src="program.js?v=eccf17ca"></script>
 </body>
 </html>
 
