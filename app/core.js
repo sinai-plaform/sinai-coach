@@ -32,7 +32,7 @@ async function useToken(th){
   return error ? {error:error.message} : {user:data.user};
 }
 
-const APP_VERSION='2.1.0';
+const APP_VERSION='2.2.0';
 const S = { user:null, club:null, role:null, teams:[], team:null, players:[], attrs:[], dbDrills:[],
             session:null, sessionDrills:[], attendance:{}, match:null, view:'home', online:navigator.onLine };
 
@@ -346,8 +346,8 @@ const looksPhone=v=>/^[+0-9][0-9\s\-()]{7,}$/.test(String(v||'').trim());
 function loginCandidates(id){
   id=id.trim();
   if(id.includes('@')) return [id.toLowerCase()];
-  if(looksPhone(id)){ const d=normPhoneDigits(id); return [`p${d}@guardian.sinai-coach.app`,`k${d}@kid.sinai-coach.app`]; }
-  return [id.toLowerCase()+'@kid.sinai-coach.app'];
+  if(looksPhone(id)){ const d=normPhoneDigits(id); return [`p${d}@guardian.sinaiclub.com`,`k${d}@kid.sinaiclub.com`]; }
+  return [id.toLowerCase()+'@kid.sinaiclub.com'];
 }
 function renderLogin(err){
   $('#nav').classList.add('hide');

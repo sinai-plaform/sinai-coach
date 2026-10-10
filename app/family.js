@@ -96,7 +96,7 @@ async function famHome(){
 /* ---------- my own login: phone + a password the person chooses ---------- */
 function myLoginId(){ const m=S.user.user_metadata||{}, e=S.user.email||'';
   if(m.phone) return m.phone.replace(/^\+972/,'0');
-  const k=e.match(/^([^@]+)@kid\.sinai-coach\.app$/); return k?k[1]:e; }
+  const k=e.match(/^([^@]+)@kid\.sinaiclub\.com$/); return k?k[1]:e; }
 function myLoginCard(){
   const set=(S.user.user_metadata||{}).pw_set;
   return `<div class="card" style="margin-top:14px${set?'':';border:2px solid var(--accent)'}">

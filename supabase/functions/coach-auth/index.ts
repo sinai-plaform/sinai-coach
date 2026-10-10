@@ -38,10 +38,10 @@ function normPhone(p: string): string | null {
   return d.replace(/[^0-9]/g, '').length < 8 ? null : d;
 }
 
-const phoneEmail = (phone: string) => `p${phone.replace(/\D/g, '')}@guardian.sinai-coach.app`;
-const playerEmail = (id: string) => `u${id.replace(/-/g, '')}@player.sinai-coach.app`;
-const kidEmail = (username: string) => `${username}@kid.sinai-coach.app`;
-const kidPhoneEmail = (phone: string) => `k${phone.replace(/\D/g, '')}@kid.sinai-coach.app`;
+const phoneEmail = (phone: string) => `p${phone.replace(/\D/g, '')}@guardian.sinaiclub.com`;
+const playerEmail = (id: string) => `u${id.replace(/-/g, '')}@player.sinaiclub.com`;
+const kidEmail = (username: string) => `${username}@kid.sinaiclub.com`;
+const kidPhoneEmail = (phone: string) => `k${phone.replace(/\D/g, '')}@kid.sinaiclub.com`;
 
 async function mintSession(email: string) {
   const { data, error } = await admin.auth.admin.generateLink({ type: 'magiclink', email });

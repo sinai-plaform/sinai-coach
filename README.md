@@ -1,6 +1,6 @@
 # SINAI Club
 
-Live at https://sinaiclub.com (GitHub Pages, custom domain). Old address sinaicoach.app redirects here (Cloudflare).
+Live at https://sinaiclub.com (GitHub Pages, custom domain).
 
 - `/` — marketing site (`index.html`, `assets/`). `/#site` always shows the site; signed-in users are sent to `/app/`.
 - `/app/` — the coach / family app (PWA). Its service worker `app/sw.js` has scope `/app/`; bump `V` there when app files change.

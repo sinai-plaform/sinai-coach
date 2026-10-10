@@ -530,7 +530,7 @@ VIEWS.more = function(){
     .then(({count})=>{ const b=$('#toFam'); if(b&&count) b.classList.remove('hide'); });
 };
 function whoAmI(){ const m=S.user?.user_metadata||{}; const e=S.user?.email||'';
-  return m.phone ? m.phone.replace(/^\+972/,'0') : /sinai-coach\.app$/.test(e) ? (m.name||'') : e; }
+  return m.phone ? m.phone.replace(/^\+972/,'0') : /@(guardian|kid|player)\.sinaiclub\.com$/.test(e) ? (m.name||'') : e; }
 async function signOut(){
   if(OFF.pending() && !confirm(`יש ${OFF.pending()} עדכונים שעוד לא נשלחו (אין קליטה). ביציאה הם יישארו בטאבלט וייצאו בכניסה הבאה. לצאת בכל זאת?`)) return;
   await sb.auth.signOut(); LS('dev',null); await OFF.clearSaved(); location.reload(); }
