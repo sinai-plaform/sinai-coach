@@ -10,6 +10,8 @@ if(!window.supabase){
   throw new Error('supabase sdk unavailable');
 }
 // every database call goes through OFF.fetch (offline.js), so the app keeps working without signal
+// opened from a "reset password" email? remember it before the SDK reads the link
+const RECOVERY = /type=recovery/.test(location.hash) || /type=recovery/.test(location.search);
 const sb = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true,autoRefreshToken:true},
   global:{fetch:OFF.fetch}});
 OFF.setAuth(async()=>{ const {data:{session}}=await sb.auth.getSession(); return session?session.access_token:null; });
@@ -239,6 +241,7 @@ async function bootstrap(){
   }
   if(!user){ renderLogin(); return; }
   S.user = user;
+  if(RECOVERY && !bootstrap.pwDone) return renderNewPassword();
 
   // 3 — staff go to the coach app, everyone else to the family app
   const meta = user.user_metadata||{};
@@ -361,6 +364,8 @@ function renderLogin(err){
       ${mode==='signup'?'<label class="f">שם מלא<input id="nm" autocomplete="name"></label>':''}
       ${mode==='email'?`<label class="f">אימייל<input id="em" type="email" inputmode="email" autocapitalize="off" dir="ltr"></label>
         <label class="f">סיסמה<input id="pw" type="password" autocomplete="new-password" placeholder="6 תווים לפחות"></label>`
+      :mode==='otp'?`<label class="f">טלפון או אימייל<input id="ph" autocapitalize="off" autocomplete="username" dir="ltr" placeholder="050-0000000 / name@gmail.com"></label>
+        <p class="xs muted">לטלפון נשלח קוד ב-SMS. לאימייל נשלח קישור לבחירת סיסמה חדשה.</p>`
       :`<label class="f">מספר טלפון<input id="ph" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" placeholder="050-0000000"></label>
         <p class="xs muted">נשלח קוד ב-SMS. אחריו בוחרים סיסמה, ומעכשיו נכנסים עם הטלפון והסיסמה.</p>`}
       <button class="btn primary big" id="doBtn">${mode==='email'?'פתיחת חשבון':'שליחת קוד'}</button>`;
@@ -423,7 +428,15 @@ function renderLogin(err){
     }
     const purpose = mode==='signup'?'signup':'login';
     if(!sent){
-      const ph=$('#ph').value.trim(); if(!ph) return showErr('צריך מספר טלפון');
+      const ph=$('#ph').value.trim(); if(!ph) return showErr(mode==='otp'?'צריך טלפון או אימייל':'צריך מספר טלפון');
+      if(mode==='otp' && ph.includes('@')){
+        busy(true,'שולח…');
+        const {error}=await sb.auth.resetPasswordForEmail(ph.toLowerCase(),{redirectTo:location.origin+location.pathname});
+        busy(false,'שליחת קוד');
+        if(error) return showErr(/rate|seconds/i.test(error.message)?'נשלח כבר מייל לפני רגע. חכו דקה ונסו שוב.':'לא הצלחנו לשלוח: '+error.message);
+        $('#app .card').innerHTML=`<div class="alert ok">אם הכתובת <b dir="ltr">${esc(ph)}</b> רשומה אצלנו, נשלח אליה מייל עם קישור לבחירת סיסמה חדשה. פתחו אותו במכשיר הזה. (לא הגיע? בדקו בספאם.)</div>`;
+        return;
+      }
       if(mode==='signup' && !$('#nm').value.trim()) return showErr('צריך שם');
       if(mode==='signup') renderLogin.name_=$('#nm').value.trim();
       busy(true,'שולח…');
@@ -442,6 +455,29 @@ function renderLogin(err){
     bootstrap();
   }
   draw();
+}
+function renderNewPassword(){
+  $('#nav').classList.add('hide');
+  $('#app').innerHTML=`<div class="wrap" style="max-width:420px;padding-top:50px">
+    <div style="text-align:center;margin-bottom:20px"><div style="font-size:44px">🔑</div>
+      <h1 style="margin-top:8px">סיסמה חדשה</h1>
+      <p class="muted sm" dir="ltr">${esc(S.user.email||'')}</p></div>
+    <div class="card stack">
+      <div id="err" class="alert hide"></div>
+      <label class="f">סיסמה חדשה<input id="np1" type="password" autocomplete="new-password" placeholder="6 תווים לפחות"></label>
+      <label class="f">שוב, לאימות<input id="np2" type="password" autocomplete="new-password"></label>
+      <button class="btn primary big" id="npBtn">שמירה וכניסה</button>
+    </div></div>`;
+  const err=m=>{ const e=$('#err'); e.textContent=m; e.classList.remove('hide'); };
+  $('#npBtn').onclick=async()=>{
+    const a=$('#np1').value, b=$('#np2').value;
+    if(a.length<6) return err('הסיסמה צריכה להיות באורך 6 תווים לפחות');
+    if(a!==b) return err('שתי הסיסמאות לא זהות');
+    const btn=$('#npBtn'); btn.disabled=true; btn.textContent='שומר…';
+    const {error}=await sb.auth.updateUser({password:a});
+    if(error){ btn.disabled=false; btn.textContent='שמירה וכניסה'; return err(/same|different/i.test(error.message)?'זו הסיסמה הקיימת — בחרו סיסמה אחרת':error.message); }
+    bootstrap.pwDone=true; toast('הסיסמה עודכנה ✓'); bootstrap();
+  };
 }
 function renderNewClub(){
   $('#nav').classList.add('hide');
