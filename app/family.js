@@ -1,4 +1,4 @@
-/* ===== SINAI Coach — the family side (parent / player) ===== */
+/* ===== SINAI Club — the family side (parent / player) ===== */
 
 const FAM = { kids:[], guardian:null, kid:null, club:null };
 
@@ -243,7 +243,7 @@ async function famKid(id){
       <div class="card" style="margin-top:10px"><p>כניסה עם: <b dir="ltr">${esc(login)}</b></p>
       ${password?`<p>סיסמה: <b dir="ltr">${esc(password)}</b></p>`:`<p class="sm">בכניסה הראשונה ${esc(first)} לוחץ "כניסה ראשונה", מקבל קוד ב-SMS ובוחר סיסמה.</p>`}</div>
       <button class="btn primary big" style="margin-top:12px" id="kcopy">העתקה לשליחה לילד</button>`);
-    $('#kcopy').onclick=()=>{ const t=`כניסה ל-SINAI Coach: ${location.origin}/app/\nטלפון / שם משתמש: ${login}\n`+(password?`סיסמה: ${password}`:'בפעם הראשונה: "כניסה ראשונה" ← קוד ב-SMS ← בוחרים סיסמה');
+    $('#kcopy').onclick=()=>{ const t=`כניסה ל-SINAI Club: ${location.origin}/app/\nטלפון / שם משתמש: ${login}\n`+(password?`סיסמה: ${password}`:'בפעם הראשונה: "כניסה ראשונה" ← קוד ב-SMS ← בוחרים סיסמה');
       (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('הועתק')).catch(()=>toast(t)); };
     famKid(k.id);
   };

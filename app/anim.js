@@ -1,4 +1,4 @@
-/* ===== SINAI Coach — drill animation =====
+/* ===== SINAI Club — drill animation =====
    Turns any drill diagram into a moving demo: the arrows are played in the
    order they were drawn. A pass / shot / dribble starts a new beat; runs
    drawn after it happen during the same beat (players move while the ball
@@ -129,7 +129,7 @@ async function recordDiag(diag, name, btn){
     const svg=cssVarsResolved(svgDiag(animFrame(plan,t))).replace('<svg ','<svg width="1200" height="800" ');
     img.onload=()=>{ cx.fillStyle='#0D1F4F'; cx.fillRect(0,0,W,H); cx.drawImage(img,0,80,W,800);
       cx.fillStyle='#fff'; cx.font='bold 40px Heebo, Arial'; cx.textAlign='right'; cx.direction='rtl';
-      cx.fillText(name, W-30, 55); cx.font='26px Heebo, Arial'; cx.textAlign='left'; cx.fillStyle='#B9EE3E'; cx.fillText('SINAI Coach', 30, 52); res(); };
+      cx.fillText(name, W-30, 55); cx.font='26px Heebo, Arial'; cx.textAlign='left'; cx.fillStyle='#B9EE3E'; cx.fillText('SINAI Club', 30, 52); res(); };
     img.onerror=()=>res();
     img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
   });

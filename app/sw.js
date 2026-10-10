@@ -1,7 +1,7 @@
-/* SINAI Coach — keeps the app itself on the tablet so it opens without signal.
+/* SINAI Club — keeps the app itself on the tablet so it opens without signal.
    The data is handled inside the app (offline.js); this file only stores the app's own files
    (about 0.5 MB). Bump V when this file changes. */
-const V = 'sc-app-v2';   // 2.0.0 — SINAI Coach blue brand, app lives at /app/
+const V = 'sc-app-v3';   // 2.1.0 — renamed SINAI Club
 const SHARED = ['https://cdn.jsdelivr.net/', 'https://fonts.googleapis.com/', 'https://fonts.gstatic.com/'];
 
 async function appFiles(html) {

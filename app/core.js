@@ -1,4 +1,4 @@
-/* ===== SINAI Coach — core ===== */
+/* ===== SINAI Club — core ===== */
 if(!window.supabase){
   document.getElementById('app').innerHTML =
     '<div class="wrap" style="padding-top:80px;max-width:400px;text-align:center">'+
@@ -32,7 +32,7 @@ async function useToken(th){
   return error ? {error:error.message} : {user:data.user};
 }
 
-const APP_VERSION='2.0.0';
+const APP_VERSION='2.1.0';
 const S = { user:null, club:null, role:null, teams:[], team:null, players:[], attrs:[], dbDrills:[],
             session:null, sessionDrills:[], attendance:{}, match:null, view:'home', online:navigator.onLine };
 
@@ -380,7 +380,7 @@ function renderLogin(err){
     $('#app').innerHTML=`<div class="wrap" style="max-width:420px;padding-top:50px">
     <div style="text-align:center;margin-bottom:20px">
       <div class="brandmark"><img src="icon.svg" alt="">
-      <h1 class="brandword" aria-label="SINAI Coach"><b>SINAI</b><span> Coach</span></h1></div>
+      <h1 class="brandword" aria-label="SINAI Club"><b>SINAI</b><span> Club</span></h1></div>
       <p class="muted sm" style="margin-top:8px">${head[mode]}</p>
     </div>
     <div class="card stack">

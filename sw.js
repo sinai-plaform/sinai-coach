@@ -1,4 +1,4 @@
-/* SINAI Coach: the app moved to /app/. This old root worker cleans up after itself:
+/* SINAI Club: the app moved to /app/. This old root worker cleans up after itself:
    it drops the old app cache, unregisters, and sends any open app window to /app/. */
 self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (e) {

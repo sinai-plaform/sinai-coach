@@ -1,4 +1,4 @@
-/* ===== SINAI Coach — league profile, health declaration, Shabbat ===== */
+/* ===== SINAI Club — league profile, health declaration, Shabbat ===== */
 
 const LEAGUE = {
   school:   {label:'בית ספר — ללא תחרות', note:'הצהרת בריאות בלבד.'},

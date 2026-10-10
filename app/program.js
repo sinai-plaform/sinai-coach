@@ -1,4 +1,4 @@
-/* ===== SINAI Coach — training program =====
+/* ===== SINAI Club — training program =====
    A season plan: themed weeks, every session built from the library in a
    fixed professional structure (activation → development → application →
    game → summary), with drills rotated so nothing repeats too soon.

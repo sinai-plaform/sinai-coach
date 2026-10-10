@@ -1,4 +1,4 @@
-/* ===== SINAI Coach — tactics board =====
+/* ===== SINAI Club — tactics board =====
    Produces exactly the diagram format the drill library already uses,
    so the board can open, edit and save any drill's picture. */
 

@@ -1,4 +1,4 @@
-/* ===== SINAI Coach — working without signal =====
+/* ===== SINAI Club — working without signal =====
    Every call the app makes to the database passes through OFF.fetch.
    • Reads  — answered by the network when it answers quickly; otherwise by the copy
               saved on the tablet the last time that screen was opened.

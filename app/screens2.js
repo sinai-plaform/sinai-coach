@@ -523,7 +523,7 @@ VIEWS.more = function(){
     <div class="sep"></div>
     <p class="xs muted">${esc(S.club?.name||'')} · ${esc(whoAmI())} · ${S.role==='coach'?'מאמן':S.role}</p>
     <p class="xs muted">ממתינים לסנכרון: ${OFF.pending()}</p>
-    <p class="xs muted" dir="ltr" style="text-align:end">SINAI Coach v${APP_VERSION}</p>
+    <p class="xs muted" dir="ltr" style="text-align:end">SINAI Club v${APP_VERSION}</p>
     <button class="btn ghost" onclick="flushQueue()">סנכרון עכשיו</button>
     <button class="btn danger" onclick="signOut()">יציאה</button></div>`);
   sb.from('coach_guardians').select('id',{count:'exact',head:true}).eq('user_id',S.user.id)

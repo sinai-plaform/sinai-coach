@@ -1,7 +1,7 @@
 {
-  "name": "SINAI Coach",
-  "short_name": "SINAI Coach",
-  "description": "SINAI Coach — אימונים, נתוני שחקנים והורים במקום אחד. עובדת גם בלי אינטרנט במגרש.",
+  "name": "SINAI Club",
+  "short_name": "SINAI Club",
+  "description": "SINAI Club — אימונים, נתוני שחקנים והורים במקום אחד. עובדת גם בלי אינטרנט במגרש.",
   "lang": "he",
   "dir": "rtl",
   "id": "./",

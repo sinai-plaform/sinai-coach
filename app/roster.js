@@ -1,4 +1,4 @@
-/* ===== SINAI Coach — roster import & parent invitations ===== */
+/* ===== SINAI Club — roster import & parent invitations ===== */
 
 /* keep this identical to coach_norm_phone() in the database */
 function normPhone(p){

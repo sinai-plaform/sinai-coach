@@ -1,4 +1,4 @@
-// SINAI Coach — identity endpoint.
+// SINAI Club — identity endpoint.
 // One login for everyone: phone (or username / email) + password.
 // The password is created by the person after proving the phone once with an SMS code
 // (Twilio Verify) — or, until SMS is on, after entering through the coach's invite link.
