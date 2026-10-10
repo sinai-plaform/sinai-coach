@@ -2,204 +2,536 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
-<meta name="theme-color" content="#18221C">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>SINAI Coach</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SINAI Coach — האפליקציה של מאמני הכדורגל</title>
+<meta name="description" content="SINAI Coach למאמני כדורגל, בתי ספר לכדורגל ומועדונים: בונה אימונים מתוך ספריית תרגילים מוכנה, דירוג שחקנים בהקשה תוך כדי משחק, כרטיס שחקן שמתעדכן מאימון לאימון, נוכחות ועדכונים להורים — גם אופליין במגרש.">
+<meta name="theme-color" content="#1E45B0">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta property="og:title" content="SINAI Coach — האפליקציה של מאמני הכדורגל">
+<meta property="og:description" content="אימון של 60 דקות בדקה, דירוג שחקנים בהקשה תוך כדי משחק, וכרטיס שחקן לכל ילד — באפליקציה אחת שעובדת גם במגרש.">
+<meta property="og:image" content="https://sinaicoach.app/assets/apple-touch-icon.png">
+<script>
+/* returning users go straight into the app */
+(function(){try{
+  if(location.hash==='#site')return;
+  /* links made by the app before it moved to /app/ (parent invites ?t=…, password-reset / sign-in links) keep working */
+  if(/[?&]t=/.test(location.search)||/(access_token|type=recovery|error_code)=?/.test(location.hash)){location.replace('/app/'+location.search+location.hash);return;}
+  var s=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches;
+  /* the key the app's login (Supabase) keeps while someone is signed in */
+  if(s||localStorage.getItem('sb-eidcnukgvmdgwmbewfgb-auth-token')||localStorage.getItem('sc.dev'))location.replace('/app/');
+}catch(e){}})();
+document.documentElement.className+=' js';
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Secular+One&family=Heebo:wght@400;500;700&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&family=Rubik:wght@500;700;800;900&family=Sora:wght@400;700&display=swap">
 <style>
+/* Team Blue: light hero with a pass-and-settle football over faint pitch lines → navy marquee → light bento → tossed team tiles → deep-blue security → navy close with lime CTA */
 :root{
-  --bg:#F3F5F0; --surface:#FFFFFF; --surface2:#E9EDE6; --ink:#18221C; --muted:#5F6D64; --line:#D7DDD4;
-  --accent:#DD6A2C; --accent-ink:#fff; --pitch:#3F8F5E; --pitch2:#3A865A;
-  --ok:#2A8F6A; --warn:#D98A2B; --bad:#C43B33; --info:#2E6FB5;
-  --ta:#2E6FB5; --tb:#C43B33; --tn:#F2C14E; --tgk:#7A4FB3; --tco:#1E1E1E;
-  --shadow:0 10px 30px rgba(20,30,24,.12); --r:14px;
-  --safeT:env(safe-area-inset-top,0px); --safeB:env(safe-area-inset-bottom,0px);
+ --deep:#0D1F4F;--pri:#1E45B0;--bri:#4D7CF0;--tint:#E9EFFC;--sky:#DCE6FB;
+ --lime:#B9EE3E;--lime-ink:#1A2606;--lime-d:#8FC21E;
+ --up:#138A4E;
+ --bg:#F5F7FB;--sur:#fff;--line:#DEE4F0;--head:#0E1B3D;--ink:#0E1B3D;--mut:#5A6680;
+ --star:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);
+ --display:'Rubik','IBM Plex Sans Hebrew',system-ui,sans-serif;--body:'IBM Plex Sans Hebrew',system-ui,sans-serif;--brand:'Sora',system-ui,sans-serif;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#111714; --surface:#1A221D; --surface2:#222C26; --ink:#EEF2EC; --muted:#9DAAA1; --line:#2B362F;
-  --accent:#F0813F; --pitch:#2F6E49; --pitch2:#2B6644; --shadow:0 10px 30px rgba(0,0,0,.45);
-}}
-:root[data-theme="dark"]{
-  --bg:#111714; --surface:#1A221D; --surface2:#222C26; --ink:#EEF2EC; --muted:#9DAAA1; --line:#2B362F;
-  --accent:#F0813F; --pitch:#2F6E49; --pitch2:#2B6644; --shadow:0 10px 30px rgba(0,0,0,.45);
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:clip}
+a{color:inherit;text-decoration:none}
+img{max-width:100%}
+.wrap{max-width:1160px;margin:0 auto;padding-inline:20px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;color:var(--head)}
+.brand{display:inline-flex;align-items:center;gap:10px;direction:ltr}
+.brand img{width:34px;height:34px}
+.word{font-family:var(--brand);font-size:22px;letter-spacing:-.3px;line-height:1;color:var(--head);white-space:nowrap}
+.word b{font-weight:700}.word span{font-weight:400;color:var(--pri)}
+/* buttons */
+.btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:50px;padding:0 24px;border-radius:14px;font-weight:700;font-size:15.5px;border:none;cursor:pointer;transition:transform .18s,box-shadow .18s,background .18s;font-family:var(--body);white-space:nowrap}
+.btn:hover{transform:translateY(-2px)}
+.btn:focus-visible{outline:3px solid var(--bri);outline-offset:3px}
+.btn-lime{background:linear-gradient(180deg,#D3F77A,var(--lime));color:var(--lime-ink);box-shadow:0 10px 26px rgba(120,170,20,.38),inset 0 1px 0 rgba(255,255,255,.6)}
+.btn-lime:hover{box-shadow:0 14px 32px rgba(120,170,20,.48),inset 0 1px 0 rgba(255,255,255,.6)}
+.btn-lime::after{content:"";position:absolute;top:0;bottom:0;width:46%;left:-60%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.7),transparent);transform:skewX(-18deg);animation:sheen 4.6s ease-in-out 1.2s infinite}
+@keyframes sheen{0%{left:-60%}28%,100%{left:130%}}
+.btn-ghost{background:rgba(255,255,255,.78);color:var(--deep);border:1px solid var(--line);box-shadow:0 6px 18px rgba(30,69,176,.08);backdrop-filter:blur(6px)}
+.btn-ghost:hover{border-color:#BFCDEB}
+.btn-pri{background:var(--pri);color:#fff;box-shadow:0 8px 20px rgba(30,69,176,.3)}
+.btn-line{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.45)}
+.btn-line:hover{background:rgba(255,255,255,.1)}
+/* nav */
+nav{position:absolute;top:0;left:0;right:0;z-index:30}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:74px;gap:16px}
+.links{display:flex;gap:24px;font-size:14.5px;font-weight:600;color:var(--mut)}
+.links a{transition:color .15s;white-space:nowrap}.links a:hover{color:var(--pri)}
+nav .btn{height:42px;padding:0 18px;font-size:14px}
+/* hero */
+.hero{position:relative;background:linear-gradient(160deg,#EEF3FF 0%,#FFFFFF 62%);color:var(--ink);padding:130px 0 0;overflow:hidden;isolation:isolate}
+.blob{position:absolute;border-radius:50%;pointer-events:none;z-index:0;will-change:transform}
+.blob.k1{width:620px;height:620px;left:-140px;top:-160px;background:radial-gradient(circle,rgba(77,124,240,.26),rgba(77,124,240,0) 66%);animation:driftA 22s ease-in-out infinite alternate}
+.blob.k2{width:560px;height:560px;right:-160px;bottom:-200px;background:radial-gradient(circle,rgba(30,69,176,.18),rgba(30,69,176,0) 66%);animation:driftB 26s ease-in-out infinite alternate}
+.blob.k3{width:380px;height:380px;left:30%;bottom:-120px;background:radial-gradient(circle,rgba(77,124,240,.2),rgba(77,124,240,0) 66%);animation:driftC 19s ease-in-out infinite alternate}
+.blob.k4{width:320px;height:320px;right:26%;top:-90px;background:radial-gradient(circle,rgba(185,238,62,.2),rgba(185,238,62,0) 66%);animation:driftB 24s ease-in-out infinite alternate-reverse}
+@keyframes driftA{to{transform:translate(120px,80px) scale(1.12)}}
+@keyframes driftB{to{transform:translate(-110px,-70px) scale(1.08)}}
+@keyframes driftC{to{transform:translate(90px,-90px) scale(1.15)}}
+.fx{position:absolute;inset:0;pointer-events:none;z-index:1;overflow:hidden}
+.hero .wrap{position:relative;z-index:2;display:grid;grid-template-columns:1.12fr .88fr;gap:30px;align-items:end}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;background:rgba(255,255,255,.85);border:1px solid var(--line);color:var(--deep);font-weight:600;font-size:13px;padding:7px 14px;border-radius:99px;box-shadow:0 6px 18px rgba(30,69,176,.08)}
+.eyebrow i{width:7px;height:7px;border-radius:50%;background:var(--bri);box-shadow:0 0 0 4px rgba(77,124,240,.18);flex:none}
+.hero h1{font-size:clamp(30px,4.9vw,64px);line-height:1.08;letter-spacing:-.025em;font-weight:900;margin:22px 0 20px}
+.hero h1 .l1{display:block;font-size:.5em;font-weight:700;color:var(--mut);letter-spacing:-.01em;margin-bottom:.12em}
+.hero h1 .l2{display:block;white-space:nowrap}
+.hero h1 em{font-style:normal;position:relative;white-space:nowrap;display:inline-block;background:linear-gradient(90deg,var(--deep),var(--bri));-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:.04em}
+.hero h1 em::after{content:"";position:absolute;inset-inline:-.04em;bottom:.08em;height:.2em;background:linear-gradient(90deg,#C9D7F8,var(--tint));opacity:.8;border-radius:6px;z-index:-1}
+.hero h1 em::before{content:"";position:absolute;width:.24em;height:.24em;top:-.04em;left:-.14em;background:var(--lime);clip-path:var(--star);animation:tw 2.4s ease-in-out infinite}
+.lead{font-size:clamp(17px,1.6vw,20px);color:var(--mut);max-width:540px;margin:0 0 30px}
+.lead b{color:var(--head);font-weight:600}
+.ctas{display:flex;gap:12px;flex-wrap:wrap}
+.hero-copy{padding-bottom:90px;min-width:0}
+.trust{display:flex;gap:12px 20px;flex-wrap:wrap;margin-top:30px;color:var(--deep);font-size:13.5px;font-weight:600}
+.trust span{display:inline-flex;align-items:center;gap:7px}
+.phones{position:relative;height:600px;min-width:0}
+.pitch{position:absolute;z-index:0;left:50%;top:46%;width:560px;height:560px;transform:translate(-50%,-50%);opacity:.18;pointer-events:none;-webkit-mask-image:radial-gradient(closest-side,#000 55%,transparent);mask-image:radial-gradient(closest-side,#000 55%,transparent)}
+.pitch *{fill:none;stroke:var(--pri);stroke-width:2.5}
+.phone{position:absolute;width:250px;border-radius:38px;padding:9px;background:var(--head);box-shadow:0 40px 80px rgba(13,31,79,.26),0 12px 30px rgba(13,31,79,.16),0 0 0 1px rgba(255,255,255,.4)}
+.phone img{display:block;width:100%;border-radius:30px;aspect-ratio:390/844;object-fit:cover;object-position:top}
+.phone::before{content:"";position:absolute;top:17px;left:50%;transform:translateX(-50%);width:80px;height:20px;border-radius:12px;background:var(--head);z-index:2}
+.p1{left:50%;transform:translateX(-50%);bottom:-70px;z-index:3;width:270px}
+.p2{left:4%;bottom:-120px;transform:rotate(-8deg);z-index:2}
+.p3{right:2%;bottom:-120px;transform:rotate(8deg);z-index:2}
+.tag{position:absolute;z-index:4;background:#fff;color:var(--head);border-radius:14px;padding:10px 14px;box-shadow:0 16px 34px rgba(13,31,79,.16);border:1px solid var(--line);font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;white-space:nowrap;animation:bob 6s ease-in-out infinite}
+.tag .ti{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none}
+.tag b{color:var(--pri)}.tag b.up{color:var(--up)}
+.t1{top:40px;right:2%}.t2{top:250px;left:-4%;animation-delay:-3s}
+@keyframes bob{50%{transform:translateY(-8px)}}
+/* the pass: a ball arcs along a dashed route and settles */
+.pass{position:absolute;z-index:5;left:-13%;top:-34px;width:240px;height:200px;pointer-events:none;transform-origin:0 0}
+.pass svg.route{position:absolute;inset:0;width:240px;height:200px;overflow:visible}
+.route .dash{fill:none;stroke:#7F9DE6;stroke-width:2.2;stroke-dasharray:5 8;stroke-linecap:round}
+.route .trace{fill:none;stroke:var(--bri);stroke-width:2.6;stroke-linecap:round;stroke-dasharray:100;stroke-dashoffset:100;opacity:0;animation:trace 8s ease-in-out infinite}
+.route .land{fill:rgba(13,31,79,.16);transform-box:fill-box;transform-origin:center;animation:land 8s ease-in-out infinite}
+.route .stk{stroke:var(--lime-d);stroke-width:3;stroke-linecap:round;opacity:0}
+.route .s1{animation:streak1 8s ease-out infinite}
+.route .s2{animation:streak2 8s ease-out infinite}
+.ball{position:absolute;left:0;top:0;width:34px;height:34px;offset-path:path('M16 184 Q 104 -46 192 104');offset-rotate:0deg;offset-distance:0%;animation:fly 8s infinite;filter:drop-shadow(0 8px 8px rgba(13,31,79,.22))}
+.ball .bi{width:100%;height:100%;animation:spin 8s infinite}
+.ball svg{display:block;width:100%;height:100%}
+@keyframes fly{
+ 0%{offset-distance:0%;opacity:0;animation-timing-function:cubic-bezier(.33,.08,.42,1)}
+ 5%{opacity:1}
+ 52%{offset-distance:100%;opacity:1}
+ 88%{offset-distance:100%;opacity:1}
+ 96%,100%{offset-distance:100%;opacity:0}
 }
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Heebo,system-ui,Arial,sans-serif;font-size:15px;line-height:1.5;
-  padding-top:var(--safeT);overscroll-behavior-y:none}
-h1,h2,h3{font-family:"Secular One",Heebo,sans-serif;font-weight:400;margin:0;line-height:1.15;text-wrap:balance}
-h1{font-size:24px} h2{font-size:19px} h3{font-size:16px}
-p{margin:0}
-button,input,select,textarea{font:inherit;color:inherit}
-button{cursor:pointer;background:none;border:0}
-input,select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
-input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.num{font-variant-numeric:tabular-nums}
-.muted{color:var(--muted)}
-.sm{font-size:13px}
-.xs{font-size:12px}
-.hide{display:none!important}
-.alert{background:rgba(196,59,51,.12);border:1px solid var(--bad);color:var(--bad);
-  border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.45}
-.alert.ok{background:rgba(42,143,106,.12);border-color:var(--ok);color:var(--ok)}
-.kid{display:flex;gap:12px;align-items:center;padding:14px;border:1px solid var(--line);
-  border-radius:14px;background:var(--surface);margin-bottom:10px}
-.kid .av{width:46px;height:46px;font-size:16px}
-.sw{position:relative;display:inline-block;width:46px;height:27px;flex:none}
-.sw input{opacity:0;width:0;height:0}
-.sw i{position:absolute;inset:0;background:var(--line);border-radius:99px;transition:.18s}
-.sw i:before{content:"";position:absolute;width:21px;height:21px;border-radius:50%;
-  background:#fff;top:3px;right:3px;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-.sw input:checked + i{background:var(--ok)}
-.sw input:checked + i:before{transform:translateX(-19px)}
-.togrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
-.togrow:last-child{border-bottom:0}
-.togrow .t{flex:1}.togrow .t b{display:block;font-size:14.5px}
-.togrow .t span{font-size:12px;color:var(--muted);line-height:1.4;display:block;margin-top:2px}
-
-/* layout */
-#app{min-height:100%;padding-bottom:calc(72px + var(--safeB))}
-.wrap{max-width:900px;margin:0 auto;padding:14px 16px 20px}
-.topbar{position:sticky;top:var(--safeT);z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
-.topbar .in{max-width:900px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
-.topbar h1{font-size:19px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.iconbtn{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:var(--surface);border:1px solid var(--line)}
-.nav{position:fixed;inset-inline:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);
-  padding-bottom:var(--safeB);box-shadow:0 -6px 20px rgba(0,0,0,.07)}
-.nav .in{max-width:900px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
-.nav button{padding:8px 2px 9px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--muted)}
-.nav button .ic{font-size:19px;line-height:1}
-.nav button.on{color:var(--accent);font-weight:500}
-
-/* cards & bits */
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
-.card+.card{margin-top:10px}
-.row{display:flex;gap:8px;align-items:center}
-.row.wrap{flex-wrap:wrap}
-.spread{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
-.stack{display:flex;flex-direction:column;gap:10px}
-.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 14px;font-weight:500;text-align:center}
-.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.btn.ghost{background:transparent}
-.btn.sm{padding:6px 11px;font-size:13px;border-radius:9px}
-.btn.big{padding:14px;font-size:16px;width:100%}
-.btn.danger{color:var(--bad);border-color:var(--bad)}
-.btn[disabled]{opacity:.45;pointer-events:none}
-.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font-size:12px;background:var(--surface2)}
-.pill.ok{background:rgba(42,143,106,.15);color:var(--ok)}
-.pill.bad{background:rgba(196,59,51,.15);color:var(--bad)}
-.pill.warn{background:rgba(217,138,43,.16);color:var(--warn)}
-.pill.info{background:rgba(46,111,181,.15);color:var(--info)}
-.chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 13px;font-size:13.5px}
-.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.sep{height:1px;background:var(--line);margin:12px -14px}
-.empty{padding:34px 14px;text-align:center;color:var(--muted)}
-label.f{display:grid;gap:5px;font-size:13px;color:var(--muted)}
-.hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 8px}
-.hd h2{font-size:17px}
-
-/* player tiles */
-.plist{display:flex;flex-direction:column;gap:6px}
-.prow{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 11px}
-.av{width:36px;height:36px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none;color:var(--muted)}
-.av.a{background:rgba(46,111,181,.18);color:var(--ta)} .av.b{background:rgba(196,59,51,.18);color:var(--tb)}
-.pname{flex:1;min-width:0}
-.pname b{font-weight:500;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
-.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 6px;text-align:center;position:relative;min-height:66px;display:flex;flex-direction:column;justify-content:center;gap:2px}
-.tile b{font-weight:500;font-size:13.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tile.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(221,106,44,.22)}
-.tile .dot{position:absolute;top:6px;inset-inline-end:6px;width:8px;height:8px;border-radius:50%}
-.tile .cnt{position:absolute;top:5px;inset-inline-start:7px;font-size:11px;color:var(--accent);font-weight:700}
-.tile.off{opacity:.42}
-.tile.ta{border-inline-start:4px solid var(--ta)} .tile.tb{border-inline-start:4px solid var(--tb)}
-
-/* score buttons */
-.scorerow{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-.scorerow button{border:1px solid var(--line);border-radius:10px;padding:13px 0;font-weight:700;font-size:17px;background:var(--surface)}
-.scorerow button[data-s="1"]{color:var(--bad)} .scorerow button[data-s="2"]{color:#C07A2B}
-.scorerow button[data-s="4"]{color:#3E8F5E} .scorerow button[data-s="5"]{color:var(--ok)}
-.starrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.starrow button{border:1px solid var(--line);border-radius:10px;padding:14px 0;font-size:19px;background:var(--surface)}
-
-/* sheet / modal */
-.sheetwrap{position:fixed;inset:0;z-index:60;display:none}
-.sheetwrap.open{display:block}
-.sheetwrap .bd{position:absolute;inset:0;background:rgba(10,14,12,.5)}
-.sheet{position:absolute;inset-inline:0;bottom:0;background:var(--surface);border-radius:18px 18px 0 0;
-  max-height:88vh;overflow:auto;padding:16px 16px calc(18px + var(--safeB));box-shadow:var(--shadow);animation:up .18s ease}
-@keyframes up{from{transform:translateY(18px);opacity:.6}to{transform:none;opacity:1}}
-.sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 12px}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-
-/* timer */
-.timer{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
-.timer .t{font-family:"Secular One",sans-serif;font-size:38px;line-height:1}
-.timer .bar{height:6px;background:var(--surface2);border-radius:99px;overflow:hidden;margin-top:8px}
-.timer .bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .5s linear}
-.timer .bar i.over{background:var(--bad)}
-
-/* attribute bars */
-.attr{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;padding:6px 0;font-size:14px}
-.attr .bar{height:7px;background:var(--surface2);border-radius:99px;overflow:hidden}
-.attr .bar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
-.attr .v{font-weight:700;min-width:28px;text-align:end}
-.attr .tr{width:16px;text-align:center;font-size:12px}
-.attr.dim{opacity:.5}
-.bar{height:7px;background:var(--surface2);border-radius:99px;overflow:hidden}
-.bar i{display:block;height:100%;border-radius:99px;background:var(--accent)}
-
-/* diagram */
-.dg{width:100%;aspect-ratio:3/2;border-radius:10px;display:block}
-.bwrap{padding-bottom:10px}
-.bpitch{border:1px solid var(--line);touch-action:none;user-select:none}
-.btools{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin-top:8px}
-.btool{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:7px 2px;
-  font-size:10.5px;line-height:1.25;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted)}
-.btool span{font-size:17px;line-height:1}
-.btool.on{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 2px rgba(221,106,44,.2)}
-@media (orientation:landscape){.bpitch{max-height:64vh;width:auto;margin:0 auto}}
-.toast{position:fixed;bottom:calc(86px + var(--safeB));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);
-  padding:9px 16px;border-radius:999px;font-size:13.5px;z-index:70;opacity:0;transition:opacity .2s;pointer-events:none;max-width:88vw;text-align:center}
-.toast.show{opacity:1}
-.banner{background:var(--warn);color:#fff;text-align:center;padding:5px;font-size:12.5px}
-table.tbl{width:100%;border-collapse:collapse;font-size:14px}
-table.tbl th,table.tbl td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:start}
-table.tbl th{color:var(--muted);font-weight:500;font-size:12.5px}
-.scroll-x{overflow-x:auto}
+@keyframes spin{
+ 0%{transform:rotate(0) translateY(0);animation-timing-function:cubic-bezier(.33,.08,.42,1)}
+ 52%{transform:rotate(-560deg) translateY(0);animation-timing-function:ease-out}
+ 58%{transform:rotate(-600deg) translateY(-12px);animation-timing-function:ease-in}
+ 64%{transform:rotate(-620deg) translateY(0);animation-timing-function:ease-out}
+ 68%{transform:rotate(-630deg) translateY(-4px);animation-timing-function:ease-in}
+ 72%,100%{transform:rotate(-636deg) translateY(0)}
+}
+@keyframes trace{0%{stroke-dashoffset:100;opacity:0;animation-timing-function:cubic-bezier(.33,.08,.42,1)}5%{opacity:.85}52%{stroke-dashoffset:0;opacity:.85}86%{opacity:.6}96%,100%{stroke-dashoffset:0;opacity:0}}
+@keyframes land{0%,48%{transform:scale(.3);opacity:0}54%{transform:scale(1);opacity:1}58%{transform:scale(.75)}64%{transform:scale(1)}88%{opacity:1}96%,100%{transform:scale(1);opacity:0}}
+@keyframes streak1{0%{opacity:0}3%{opacity:1}14%,100%{opacity:0}}
+@keyframes streak2{0%,51%{opacity:0}54%{opacity:1}66%,100%{opacity:0}}
+.sp{position:absolute;left:0;top:0;width:var(--s,10px);height:var(--s,10px);margin:calc(var(--s,10px)/-2) 0 0 calc(var(--s,10px)/-2);background:var(--c,var(--lime));opacity:0}
+.sp.st{clip-path:var(--star)}
+.sp.dot{border-radius:50%}
+.burst .sp{animation:pop2 1.3s ease-out forwards}
+@keyframes pop2{0%{opacity:0;transform:translate(0,0) scale(.2)}25%{opacity:1;transform:translate(calc(var(--dx)*.45),calc(var(--dy)*.45)) scale(1.1) rotate(40deg)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3) rotate(120deg)}}
+@keyframes tw{0%,100%{transform:scale(.7) rotate(0);opacity:.7}50%{transform:scale(1.15) rotate(45deg);opacity:1}}
+/* audiences marquee */
+.ind{background:linear-gradient(90deg,var(--deep),var(--pri) 50%,var(--deep));color:#fff;overflow:hidden;padding:17px 0;position:relative}
+.marq{display:flex;width:max-content;animation:marq 48s linear infinite;font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:-.01em}
+.marq span{display:inline-flex;align-items:center;gap:30px;padding-inline-end:30px;white-space:nowrap}
+.marq span::after{content:"";width:9px;height:9px;background:var(--lime);clip-path:var(--star);transform:scale(1.3)}
+.marq span:nth-child(3n+2)::after{background:#9DB8F7}
+.marq span:nth-child(3n)::after{background:#C9D7F8}
+@keyframes marq{to{transform:translateX(50%)}}
+/* sections */
+section{padding:96px 0}
+.sh{max-width:720px;margin:0 0 48px}
+.sh.c{text-align:center;margin-inline:auto}
+.kicker{display:inline-flex;align-items:center;gap:8px;color:var(--pri);font-weight:700;font-size:13.5px;letter-spacing:.04em;margin-bottom:12px}
+.kicker::before{content:"";width:11px;height:11px;background:var(--bri);clip-path:var(--star);animation:tw 3s ease-in-out infinite}
+.sh h2{font-size:clamp(32px,4.4vw,52px);line-height:1.08;letter-spacing:-.022em;font-weight:800;margin-bottom:16px}
+.sh p{color:var(--mut);font-size:18px;margin:0}
+/* bento */
+.bento{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+.b{background:var(--sur);border:1px solid var(--line);border-radius:22px;padding:28px;position:relative;overflow:hidden;min-width:0;transition:transform .25s,box-shadow .25s;box-shadow:0 1px 2px rgba(13,31,79,.04)}
+.b:hover{transform:translateY(-4px);box-shadow:0 22px 44px -18px rgba(30,69,176,.28)}
+.b h3{font-size:22px;letter-spacing:-.01em;margin:14px 0 8px;font-weight:700}
+.b p{margin:0;color:var(--mut);font-size:15.5px}
+.b .ic{width:48px;height:48px;border-radius:14px;background:var(--tint);display:flex;align-items:center;justify-content:center}
+.b .ic.sky{background:var(--sky)}
+.b.w4{grid-column:span 4}.b.w2{grid-column:span 2}.b.w3{grid-column:span 3}
+.b.feature{background:radial-gradient(420px 260px at 0% 100%,rgba(77,124,240,.45),transparent 70%),linear-gradient(150deg,var(--pri),var(--deep));color:#fff;border:none;box-shadow:0 24px 50px -20px rgba(30,69,176,.55)}
+.b.feature h3{color:#fff}
+.b.feature p{color:#DCE5FA}.b.feature .ic{background:rgba(255,255,255,.16)}
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;position:relative;z-index:1}
+.pill{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:99px;padding:6px 13px;font-size:13px;font-weight:700}
+.b .pill{background:var(--tint);border-color:transparent;color:var(--deep)}
+.b.feature .pill{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.26);color:#fff}
+.mini-pitch{position:absolute;left:0;top:0;width:300px;height:190px;opacity:.9;-webkit-mask-image:linear-gradient(200deg,transparent 0%,#000 40%);mask-image:linear-gradient(200deg,transparent 0%,#000 40%)}
+.mini-pitch .ln{fill:none;stroke:rgba(255,255,255,.22);stroke-width:2}
+.mini-pitch .run{fill:none;stroke:var(--lime);stroke-width:2.6;stroke-dasharray:6 8;stroke-linecap:round}
+.mini-pitch .pl{fill:#fff}
+.mini-pitch .cn{fill:var(--lime)}
+.b.feature>*:not(.mini-pitch){position:relative;z-index:1}
+.soon{display:inline-flex;align-items:center;gap:7px;margin-top:16px;background:var(--tint);color:var(--deep);border:1px solid #C9D7F8;border-radius:10px;padding:8px 12px;font-size:13.5px;font-weight:700}
+.soon svg{flex:none}
+.attr{margin-top:18px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:9px;font-size:13.5px}
+.attr div{display:grid;grid-template-columns:62px 1fr 26px 30px;align-items:center;gap:10px;font-variant-numeric:tabular-nums}
+.attr .lb{color:var(--head);font-weight:600}
+.attr .bar{height:8px;border-radius:99px;background:var(--tint);overflow:hidden}
+.attr .bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(270deg,var(--bri),var(--pri))}
+.attr .v{font-family:var(--brand);font-weight:700;color:var(--head);text-align:center}
+.attr .d{font-family:var(--brand);font-weight:700;color:var(--up);font-size:12.5px;direction:ltr;text-align:right}
+/* fit + tossed tiles */
+.fit{display:grid;grid-template-columns:1fr 1.05fr;gap:56px;align-items:center}
+.fit h2{font-size:clamp(30px,4vw,48px);line-height:1.08;letter-spacing:-.02em;font-weight:800;margin-bottom:16px}
+.toss{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 12px;padding:18px 6px}
+.toss::before{content:"";position:absolute;inset:6% 4%;border-radius:40px;background:radial-gradient(closest-side,rgba(77,124,240,.14),transparent);z-index:-1}
+.tile{transform:translate(var(--jx,0),var(--jy,0)) rotate(var(--r,0deg));z-index:var(--z,1);position:relative}
+.face{height:100%;min-height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;padding:14px 8px 12px;border-radius:20px;background:var(--tb,var(--tint));border:1px solid rgba(255,255,255,.9);box-shadow:0 14px 26px -12px var(--tsh,rgba(30,69,176,.4)),0 2px 4px rgba(13,31,79,.05);font-weight:700;font-size:14.5px;line-height:1.25;color:var(--head);transition:transform .25s cubic-bezier(.3,1.6,.5,1),box-shadow .25s}
+.face:hover{transform:translateY(-7px) rotate(calc(var(--r,0deg) * -.6)) scale(1.04);box-shadow:0 24px 34px -14px var(--tsh,rgba(30,69,176,.5))}
+.face .ico{width:46px;height:46px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px -4px var(--tsh,rgba(30,69,176,.4))}
+.face svg{width:26px;height:26px;fill:none;stroke:var(--tc,var(--pri));stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.c-a{--tb:linear-gradient(160deg,#EEF3FD,#E0E9FB);--tc:#1E45B0;--tsh:rgba(30,69,176,.38)}
+.c-b{--tb:linear-gradient(160deg,#E7EEFE,#D3E0FC);--tc:#2F5BD0;--tsh:rgba(77,124,240,.42)}
+.c-c{--tb:linear-gradient(160deg,#F2F5FB,#E3E9F4);--tc:#0D1F4F;--tsh:rgba(13,31,79,.3)}
+.c-d{--tb:linear-gradient(160deg,#EDF1FA,#DCE4F6);--tc:#4D7CF0;--tsh:rgba(77,124,240,.36)}
+.tile.more{grid-column:2 / span 2}
+.tile.more .face{min-height:64px;flex-direction:row;background:#fff;border:2px dashed #AFC2EE;color:var(--deep);font-size:16px;box-shadow:none}
+.tile.more .ico{width:34px;height:34px;border-radius:50%;background:var(--lime);box-shadow:0 6px 14px -4px rgba(120,170,20,.6)}
+.tile.more svg{stroke:var(--lime-ink);stroke-width:2.6;width:18px;height:18px}
+.js .toss .tile{opacity:0}
+.toss.in .tile{animation:toss 1.15s cubic-bezier(.22,.75,.3,1) calc(var(--i,0) * 80ms) both}
+@keyframes toss{
+ 0%{opacity:0;transform:translate(calc(var(--jx,0px) + var(--fx,0px) * .35),calc(var(--jy,0px) - 460px)) rotate(var(--fr,0deg)) scale(1.1)}
+ 14%{opacity:1}
+ 60%{transform:translate(var(--jx,0px),calc(var(--jy,0px) + 16px)) rotate(calc(var(--r,0deg) * -.7)) scale(.98)}
+ 76%{transform:translate(var(--jx,0px),calc(var(--jy,0px) - 10px)) rotate(calc(var(--r,0deg) * 1.3)) scale(1.01)}
+ 89%{transform:translate(var(--jx,0px),calc(var(--jy,0px) + 3px)) rotate(calc(var(--r,0deg) * .9))}
+ 100%{opacity:1;transform:translate(var(--jx,0px),var(--jy,0px)) rotate(var(--r,0deg)) scale(1)}
+}
+.ticks{list-style:none;padding:0;margin:20px 0 0;display:grid;gap:12px}
+.ticks li{display:flex;gap:11px;align-items:flex-start;font-size:16px;color:var(--head)}
+.ticks li::before{content:"";flex:none;width:22px;height:22px;margin-top:2px;border-radius:50%;background:var(--tint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4 8-9' fill='none' stroke='%231E45B0' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat}
+/* split */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.split.rev .txt{order:2}
+.txt h2{font-size:clamp(30px,3.6vw,44px);line-height:1.1;letter-spacing:-.02em;font-weight:800;margin-bottom:16px}
+.txt p{color:var(--mut);font-size:17px;margin:0}
+.shot{display:flex;justify-content:center;position:relative}
+.shot .phone{position:relative;width:280px}
+.shot::before{content:"";position:absolute;width:420px;height:420px;max-width:110%;border-radius:50%;background:radial-gradient(circle at 40% 40%,rgba(77,124,240,.28),transparent 62%),radial-gradient(circle at 70% 70%,rgba(185,238,62,.22),transparent 58%);top:50%;left:50%;transform:translate(-50%,-50%)}
+.split.rev .shot::before{background:radial-gradient(circle at 40% 40%,rgba(30,69,176,.18),transparent 62%),radial-gradient(circle at 70% 65%,rgba(77,124,240,.3),transparent 58%)}
+/* parents */
+.par{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.pc{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;transition:transform .25s,box-shadow .25s}
+.pc:hover{transform:translateY(-4px);box-shadow:0 20px 40px -18px rgba(30,69,176,.3)}
+.pc .ic{width:48px;height:48px;border-radius:14px;background:var(--tint);display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.pc h3{font-size:19px;margin-bottom:6px}.pc p{margin:0;color:var(--mut);font-size:15px}
+/* security */
+.sec{background:radial-gradient(500px 300px at 100% 0%,rgba(77,124,240,.5),transparent 70%),linear-gradient(140deg,var(--deep) 0%,var(--pri) 100%);color:#fff;border-radius:32px;padding:56px;display:grid;grid-template-columns:.9fr 1.1fr;gap:48px;align-items:center;position:relative;overflow:hidden;box-shadow:0 30px 60px -28px rgba(13,31,79,.6)}
+.sec h2{font-size:clamp(30px,3.6vw,44px);line-height:1.1;font-weight:800;margin:0 0 14px;color:#fff}
+.sec p{color:#D5DFF7;margin:0;font-size:17px}
+.sec .kicker{color:#B8CBFA}.sec .kicker::before{background:var(--lime)}
+.sec>div{position:relative;z-index:1}.sec .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.sec .it{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:20px;transition:background .2s}
+.sec .it:hover{background:rgba(255,255,255,.14)}
+.sec .it b{display:block;font-size:16px;margin-bottom:4px}
+.sec .it span{color:#CBD7F5;font-size:14.5px}
+.shield{position:absolute;z-index:0;left:-60px;bottom:-80px;width:280px;opacity:.08}
+/* setup */
+.setup h2.big{font-size:clamp(40px,7vw,92px);line-height:1.02;letter-spacing:-.03em;font-weight:900;margin:0 0 44px}
+.setup h2.big span{display:block}
+.setup h2.big span+span{color:var(--pri);background:linear-gradient(90deg,var(--bri),var(--pri));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;width:fit-content;padding-bottom:.06em}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.step{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;transition:transform .25s,box-shadow .25s}
+.step:hover{transform:translateY(-4px);box-shadow:0 20px 40px -18px rgba(30,69,176,.3)}
+.step .n{font-family:var(--brand);font-weight:700;font-size:15px;color:var(--pri);background:var(--tint);border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+.step:nth-child(2) .n{background:var(--sky);color:var(--deep)}.step:nth-child(3) .n{background:var(--pri);color:#fff}
+.step h3{font-size:19px;margin-bottom:6px}.step p{margin:0;color:var(--mut);font-size:15px}
+/* cta */
+.cta{position:relative;overflow:hidden;background:radial-gradient(420px 260px at 10% 0%,rgba(77,124,240,.55),transparent 70%),radial-gradient(300px 200px at 95% 100%,rgba(185,238,62,.14),transparent 70%),linear-gradient(135deg,var(--deep),#16348A);color:#fff;border-radius:32px;padding:56px;display:flex;align-items:center;justify-content:space-between;gap:28px;flex-wrap:wrap;box-shadow:0 30px 60px -28px rgba(13,31,79,.7)}
+.cta>div{position:relative;z-index:1}
+.cta h2{font-size:clamp(28px,3.6vw,44px);line-height:1.1;font-weight:800;margin:0 0 8px;color:#fff}
+.cta p{margin:0;font-size:17px;color:#D5DFF7}
+.cta .deco{position:absolute;background:var(--lime);clip-path:var(--star);opacity:.85;animation:tw 3s ease-in-out infinite;pointer-events:none}
+.mail{font-family:var(--brand);font-weight:700;direction:ltr;unicode-bidi:isolate}
+footer{padding:40px 0 56px;color:var(--mut);font-size:14px}
+footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+@media (prefers-reduced-motion:reduce){
+ .marq,.blob,.tag,.btn-lime::after,.kicker::before,.hero h1 em::before,.cta .deco,.ball,.ball .bi,.route .trace,.route .land,.route .stk{animation:none!important}
+ .ball{offset-distance:100%;opacity:1}
+ .route .trace{stroke-dashoffset:0;opacity:.85}
+ .route .stk{opacity:0}
+ .btn-lime::after{display:none}
+ .js .toss .tile{opacity:1}.toss.in .tile{animation:none}
+ .face,.b,.step,.pc,.btn{transition:none}
+}
+@media (max-width:1100px){.links{display:none}}
+@media (max-width:980px){
+ .hero .wrap,.fit,.split,.sec{grid-template-columns:1fr}
+ .split.rev .txt{order:0}
+ .hero-copy{padding-bottom:20px}
+ .phones{height:520px}
+ .bento{grid-template-columns:1fr 1fr}
+ .b.w4,.b.w3,.b.w2{grid-column:span 2}
+ .steps,.par{grid-template-columns:1fr}
+ .sec{padding:40px 28px}
+ .pass{left:2%;top:-24px}
+}
+@media (max-width:560px){
+ .hero{padding-top:104px}
+ .hero h1{font-size:min(9.2vw,40px)}
+ .phones{height:440px}
+ .pitch{width:420px;height:420px}
+ .phone{width:200px}.p1{width:220px}
+ .p2{left:-14%}.p3{right:-14%}
+ .t2{display:none}.t1{right:0;top:10px}
+ .pass{left:-2%;top:-10px;transform:scale(.62)}
+ section{padding:68px 0}
+ .sec .grid{grid-template-columns:1fr}
+ .cta{padding:36px 24px}
+ .cta .deco:nth-of-type(3){display:none}
+ nav .btn-ghost{display:none}
+ .word{font-size:20px}.brand img{width:30px;height:30px}
+ .b{padding:22px}
+ .mini-pitch{opacity:.35;width:220px;height:140px}
+ .toss{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 9px;padding:10px 2px}
+ .tile{transform:translate(calc(var(--jx,0px) * .4),calc(var(--jy,0px) * .5)) rotate(calc(var(--r,0deg) * .55))}
+ .tile.more{grid-column:1 / -1}
+ .face{min-height:104px;font-size:13px;padding:12px 4px 10px;border-radius:16px}
+ .face .ico{width:40px;height:40px;border-radius:12px}
+ .face svg{width:23px;height:23px}
+ @keyframes toss{
+  0%{opacity:0;transform:translate(calc(var(--jx,0px) * .4),-420px) rotate(var(--fr,0deg))}
+  14%{opacity:1}
+  60%{transform:translate(calc(var(--jx,0px) * .4),calc(var(--jy,0px) * .5 + 12px)) rotate(calc(var(--r,0deg) * -.4))}
+  78%{transform:translate(calc(var(--jx,0px) * .4),calc(var(--jy,0px) * .5 - 7px)) rotate(calc(var(--r,0deg) * .75))}
+  100%{opacity:1;transform:translate(calc(var(--jx,0px) * .4),calc(var(--jy,0px) * .5)) rotate(calc(var(--r,0deg) * .55))}
+ }
+}
 </style>
 </head>
 <body>
-<div id="offlineBar" class="banner hide">אופליין — הנתונים נשמרים במכשיר ויסונכרנו אוטומטית</div>
-<div id="app"></div>
-<nav class="nav hide" id="nav"><div class="in">
-  <button data-go="home"><span class="ic">🏠</span>היום</button>
-  <button data-go="squad"><span class="ic">👥</span>סגל</button>
-  <button data-go="program"><span class="ic">📋</span>אימונים</button>
-  <button data-go="library"><span class="ic">⚽</span>ספרייה</button>
-  <button data-go="more"><span class="ic">⋯</span>עוד</button>
+<nav><div class="wrap">
+ <a href="#" class="brand" aria-label="SINAI Coach"><img src="assets/icon.svg" alt=""><span class="word"><b>SINAI</b><span> Coach</span></span></a>
+ <div class="links"><a href="#features">יכולות</a><a href="#fit">לכל מועדון</a><a href="#managers">למנהלים</a><a href="#parents">להורים</a><a href="#security">אבטחה</a><a href="#setup">הקמה</a></div>
+ <div style="display:flex;gap:8px"><a class="btn btn-ghost" href="#contact">תיאום הדגמה</a><a class="btn btn-lime" href="/app/">כניסה למערכת</a></div>
 </div></nav>
-<div class="sheetwrap" id="sheetWrap"><div class="bd" id="sheetBd"></div><div class="sheet" id="sheet"></div></div>
-<div class="toast" id="toast"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="drills.js?v=588a5ba0"></script>
-<script src="config.js?v=b8a874fc"></script>
-<script src="offline.js?v=ce214601"></script>
-<script src="core.js?v=34322b9a"></script>
-<script src="rules.js?v=99a4d778"></script>
-<script src="screens.js?v=f0eecd61"></script>
-<script src="screens2.js?v=dc237978"></script>
-<script src="roster.js?v=95266600"></script>
-<script src="family.js?v=d2c9b65c"></script>
-<script src="board.js?v=e057f13a"></script>
-<script src="anim.js?v=1d6a5819"></script>
-<script src="program.js?v=9f8a4c5d"></script>
+
+<header class="hero">
+ <div class="blob k1"></div><div class="blob k2"></div><div class="blob k3"></div><div class="blob k4"></div>
+ <div class="fx" id="fx" aria-hidden="true"></div>
+ <div class="wrap">
+  <div class="hero-copy">
+   <span class="eyebrow"><i></i>האפליקציה של מאמני כדורגל ובתי ספר לכדורגל</span>
+   <h1><span class="l1">מאמן,</span><span class="l2">האימון הבא כבר <em>מוכן</em>.</span></h1>
+   <p class="lead">בונים אימון של 60 דקות <b>בדקה</b> מתוך ספריית תרגילים מוכנה, מדרגים שחקנים בהקשה תוך כדי משחק, וכל ילד מקבל <b>כרטיס שחקן</b> שמתעדכן מאימון לאימון.</p>
+   <div class="ctas"><a class="btn btn-lime" href="#contact">לתיאום הדגמה</a><a class="btn btn-ghost" href="/app/">כניסה למערכת</a></div>
+   <div class="trust">
+    <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M9 8h7M9 12h5"/></svg>ספריית תרגילים בשיטת לה מסיה</span>
+    <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2.2" stroke-linecap="round"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.6a10 10 0 0 1 14 0M8.5 16.4a5 5 0 0 1 7 0"/><path d="M3 3l18 18"/></svg>עובדת גם אופליין במגרש</span>
+    <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="3"/><circle cx="16.5" cy="9.5" r="2.4"/><path d="M3 20c0-3.3 2.5-5.6 5.5-5.6S14 16.7 14 20M15 14.6c3 0 5.5 1.9 5.5 5.4"/></svg>הורים ושחקנים מחוברים</span>
+   </div>
+  </div>
+  <div class="phones" aria-hidden="true">
+   <svg class="pitch" viewBox="0 0 560 560"><line x1="0" y1="280" x2="560" y2="280"/><circle cx="280" cy="280" r="86"/><circle cx="280" cy="280" r="4" style="fill:#1E45B0"/></svg>
+   <div class="phone p2"><img src="assets/plan.webp" alt=""></div>
+   <div class="phone p3"><img src="assets/match.webp" alt=""></div>
+   <div class="phone p1"><img src="assets/card.webp" alt="" loading="eager"></div>
+   <div class="tag t1"><span class="ti" style="background:var(--tint)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M15.5 11.5l2 2 4-4.5"/></svg></span><span><b>14/16</b> הגיעו לאימון</span></div>
+   <div class="tag t2"><span class="ti" style="background:#E3F5EA"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#138A4E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span><span>הדירוג נשמר · <b class="up" dir="ltr">+3</b> כדרור</span></div>
+   <div class="pass" id="pass">
+    <svg class="route" viewBox="0 0 240 200">
+     <path class="dash" d="M16 184 Q 104 -46 192 104"/>
+     <path class="trace" pathLength="100" d="M16 184 Q 104 -46 192 104"/>
+     <ellipse class="land" cx="192" cy="122" rx="15" ry="4"/>
+     <g class="stk s1"><line x1="2" y1="176" x2="-12" y2="186"/><line x1="10" y1="196" x2="-6" y2="204"/><line x1="-4" y1="164" x2="-16" y2="170"/></g>
+     <g class="stk s2"><line x1="214" y1="98" x2="226" y2="92"/><line x1="216" y1="112" x2="230" y2="112"/><line x1="170" y1="98" x2="160" y2="92"/></g>
+    </svg>
+    <div class="ball"><div class="bi"><svg viewBox="-1 -1 46 46"><defs><clipPath id="bc"><circle cx="22" cy="22" r="20"/></clipPath><radialGradient id="bs" cx=".35" cy=".3" r=".8"><stop offset=".55" stop-color="#fff"/><stop offset="1" stop-color="#D4DDEF"/></radialGradient></defs><circle cx="22" cy="22" r="20" fill="url(#bs)"/><g clip-path="url(#bc)" fill="#0D1F4F" stroke="#0D1F4F" stroke-width="1.2" stroke-linejoin="round"><polygon points="22.0,15.0 28.7,19.8 26.1,27.7 17.9,27.7 15.3,19.8"/><polygon points="22.0,8.5 15.8,4.0 18.2,-3.3 25.8,-3.3 28.2,4.0"/><polygon points="34.8,17.8 37.2,10.6 44.8,10.6 47.2,17.8 41.0,22.3"/><polygon points="29.9,32.9 37.6,32.9 39.9,40.2 33.8,44.7 27.6,40.2"/><polygon points="14.1,32.9 16.4,40.2 10.2,44.7 4.1,40.2 6.4,32.9"/><polygon points="9.2,17.8 3.0,22.3 -3.2,17.8 -0.8,10.6 6.8,10.6"/><path fill="none" d="M22 15V8.5M28.7 19.8l6.1-2M26.1 27.7l3.8 5.2M17.9 27.7l-3.8 5.2M15.3 19.8l-6.1-2"/></g><circle cx="22" cy="22" r="20" fill="none" stroke="#0D1F4F" stroke-width="1.6"/></svg></div></div>
+   </div>
+  </div>
+ </div>
+</header>
+
+<div class="ind" aria-label="למי זה מתאים"><div class="marq" id="marq">
+ <span>גן חובה</span><span>א׳–ב׳</span><span>ג׳–ד׳</span><span>ה׳–ז׳</span><span>נוער</span><span>בתי ספר לכדורגל</span><span>מועדונים</span><span>אקדמיות</span><span>ליגות ילדים</span><span>מתנ״סים</span><span>מאמנים פרטיים</span><span>קבוצות בנות</span>
+ <span aria-hidden="true">גן חובה</span><span aria-hidden="true">א׳–ב׳</span><span aria-hidden="true">ג׳–ד׳</span><span aria-hidden="true">ה׳–ז׳</span><span aria-hidden="true">נוער</span><span aria-hidden="true">בתי ספר לכדורגל</span><span aria-hidden="true">מועדונים</span><span aria-hidden="true">אקדמיות</span><span aria-hidden="true">ליגות ילדים</span><span aria-hidden="true">מתנ״סים</span><span aria-hidden="true">מאמנים פרטיים</span><span aria-hidden="true">קבוצות בנות</span>
+ <span aria-hidden="true">גן חובה</span><span aria-hidden="true">א׳–ב׳</span><span aria-hidden="true">ג׳–ד׳</span><span aria-hidden="true">ה׳–ז׳</span><span aria-hidden="true">נוער</span><span aria-hidden="true">בתי ספר לכדורגל</span><span aria-hidden="true">מועדונים</span><span aria-hidden="true">אקדמיות</span><span aria-hidden="true">ליגות ילדים</span><span aria-hidden="true">מתנ״סים</span><span aria-hidden="true">מאמנים פרטיים</span><span aria-hidden="true">קבוצות בנות</span>
+ <span aria-hidden="true">גן חובה</span><span aria-hidden="true">א׳–ב׳</span><span aria-hidden="true">ג׳–ד׳</span><span aria-hidden="true">ה׳–ז׳</span><span aria-hidden="true">נוער</span><span aria-hidden="true">בתי ספר לכדורגל</span><span aria-hidden="true">מועדונים</span><span aria-hidden="true">אקדמיות</span><span aria-hidden="true">ליגות ילדים</span><span aria-hidden="true">מתנ״סים</span><span aria-hidden="true">מאמנים פרטיים</span><span aria-hidden="true">קבוצות בנות</span>
+</div></div>
+
+<section id="features"><div class="wrap">
+ <div class="sh"><div class="kicker">יכולות</div><h2>כל מה שקורה במגרש — באפליקציה אחת.</h2><p>SINAI Coach נבנתה על המגרש, יחד עם מאמנים, סביב מה שבאמת קורה באימון — ולא סביב טבלאות במשרד.</p></div>
+ <div class="bento">
+  <div class="b w4 feature">
+   <svg class="mini-pitch" viewBox="0 0 300 190" aria-hidden="true"><line class="ln" x1="236" y1="0" x2="236" y2="190"/><circle class="ln" cx="236" cy="86" r="42"/><path class="ln" d="M0 40h46v92H0"/><path class="run" d="M34 150 C 70 150, 90 110, 120 100 S 170 70, 200 34"/><circle class="pl" cx="34" cy="150" r="6"/><circle class="pl" cx="120" cy="100" r="6"/><circle class="pl" cx="200" cy="34" r="6"/><path class="cn" d="M84 62l5-11 5 11z"/><path class="cn" d="M160 140l5-11 5 11z"/></svg>
+   <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="4" width="15" height="17" rx="2.5"/><path d="M9 4V2.8h6V4"/><path d="M8 9l2.2 2.2M10.2 9L8 11.2"/><circle cx="15.5" cy="16" r="1.6"/><path d="M10 14c1.2 2 2.4 2.4 3.6 2.2"/></svg></div>
+   <h3>בונה אימונים חכם</h3>
+   <p style="max-width:440px">בוחרים נושא וגיל, ומקבלים אימון מלא באורך שהגדרתם: חימום, תרגילים ומשחק סיום — עם שרטוט לכל תרגיל. כל מאמן מוסיף תרגילים משלו לתיקייה המשותפת.</p>
+   <div class="pills"><span class="pill">לפי גיל</span><span class="pill">לפי נושא</span><span class="pill">אורך אימון לבחירה</span><span class="pill">שרטוט לכל תרגיל</span><span class="pill">תיקייה משותפת</span></div>
+  </div>
+  <div class="b w2">
+   <div class="ic sky"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/></svg></div>
+   <h3>דירוג בהקשה, תוך כדי משחק</h3>
+   <p>תגיות מהירות לכל שחקן — מסירה, בעיטה, כדרור, מאמץ — והערה קצרה כשצריך.</p>
+  </div>
+  <div class="b w3">
+   <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h4M7 13h10M7 17h7"/></svg></div>
+   <h3>כרטיס שחקן כמו ב-Football Manager</h3>
+   <p>כל דירוג מצטבר לפרופיל תכונות אישי עם מגמה חודשית, כך שרואים בדיוק מי מתקדם ובמה.</p>
+   <div class="attr" aria-hidden="true">
+    <div><span class="lb">מסירה</span><span class="bar"><i style="width:81%"></i></span><span class="v">81</span><span class="d">+4</span></div>
+    <div><span class="lb">כדרור</span><span class="bar"><i style="width:68%"></i></span><span class="v">68</span><span class="d">+3</span></div>
+    <div><span class="lb">מאמץ</span><span class="bar"><i style="width:90%"></i></span><span class="v">90</span><span class="d">+2</span></div>
+   </div>
+  </div>
+  <div class="b w3">
+   <div class="ic sky"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/></svg></div>
+   <h3>משחק סיום בלחיצה</h3>
+   <p>חלוקה אוטומטית לקבוצות מאוזנות או ידנית, תוצאה, ודירוגים — הכול בלי לעזוב את המגרש.</p>
+   <div class="pills"><span class="pill">קבוצות מאוזנות</span><span class="pill">תוצאה</span><span class="pill">דירוג מהיר</span></div>
+  </div>
+  <div class="b w3">
+   <div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6l1.5 1.5L8 4.5M3.5 12l1.5 1.5L8 10.5M3.5 18l1.5 1.5L8 16.5M11.5 6h9M11.5 12h9M11.5 18h9"/></svg></div>
+   <h3>נוכחות ותקשורת עם הורים</h3>
+   <p>רישום נוכחות בהקשה, והודעות מוכנות להורים ולקבוצה — נכתבות מהנתונים ויוצאות בוואטסאפ בלחיצה.</p>
+  </div>
+  <div class="b w3">
+   <div class="ic sky"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.4 1.2-3.8 2.5-5 .3 1.6 1 2.6 2 3 .3-3-.5-5.5.5-8z"/></svg></div>
+   <h3>מוטיבציה שמגיעה מהמאמץ</h3>
+   <p>יעדים אישיים לכל שחקן ותכונות שמשתפרות מאימון לאימון — על השקעה ושיפור, לא רק על כישרון.</p>
+   <span class="soon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>בתכנון: XP ואתגרי חברים בסרטון, והרשמה ותשלום למועדונים</span>
+  </div>
+ </div>
+</div></section>
+
+<section id="fit" style="padding-top:20px"><div class="wrap fit">
+ <div>
+  <div class="kicker">לכל מועדון</div>
+  <h2>כל גיל, כל קבוצה,<br>כל שיטת עבודה.</h2>
+  <p style="color:var(--mut);font-size:17px;margin:0">SINAI Coach מתאימה את עצמה לקבוצה: פרופיל לפי גיל ולפי ליגה או בלי ליגה, אורך אימון, תכונות שמדרגים ותפקידים — מאמן, מנהל, שחקן והורה.</p>
+  <ul class="ticks"><li>פרופיל קבוצה לפי גיל וליגה</li><li>אורך אימון ותבניות לפי המועדון</li><li>תוכנית אימונים לפי נושא ושבוע, שנבנית אוטומטית</li></ul>
+ </div>
+ <div class="toss" id="toss" role="list" aria-label="מסגרות לדוגמה">
+  <div class="tile" role="listitem" style="--i:0;--jx:4px;--jy:6px;--r:-6deg;--fx:-160px;--fr:-50deg;--z:2"><div class="face c-a"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="13" width="7.5" height="7.5" rx="1.5"/><rect x="8.25" y="4" width="7.5" height="7.5" rx="1.5"/></svg></span>גן ושכבות צעירות</div></div>
+  <div class="tile" role="listitem" style="--i:3;--jx:-6px;--jy:-4px;--r:5deg;--fx:120px;--fr:40deg;--z:3"><div class="face c-b"><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 20.5V10l8-5 8 5v10.5"/><path d="M2 20.5h20"/><path d="M10 20.5V16h4v4.5"/><path d="M12 5V1.8l3.2 1.1L12 4"/><circle cx="12" cy="11.5" r="1.8"/></svg></span>בתי ספר לכדורגל</div></div>
+  <div class="tile" role="listitem" style="--i:1;--jx:3px;--jy:10px;--r:-3deg;--fx:-90px;--fr:-30deg;--z:1"><div class="face c-c"><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l7.5 2.6V11c0 4.7-3.1 8.1-7.5 10-4.4-1.9-7.5-5.3-7.5-10V5.6z"/><path d="M4.6 10h14.8"/><path d="M12 13l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2-1.6-1.5 2.2-.3z"/></svg></span>מועדונים</div></div>
+  <div class="tile" role="listitem" style="--i:5;--jx:-4px;--jy:-2px;--r:8deg;--fx:180px;--fr:60deg;--z:2"><div class="face c-d"><span class="ico"><svg viewBox="0 0 24 24"><path d="M2 9.5l10-5 10 5-10 5z"/><path d="M6 11.5v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/><path d="M22 9.5v5"/></svg></span>אקדמיות</div></div>
+  <div class="tile" role="listitem" style="--i:2;--jx:8px;--jy:-8px;--r:4deg;--fx:-200px;--fr:35deg;--z:3"><div class="face c-b"><span class="ico"><svg viewBox="0 0 24 24"><path d="M7 3.5h10V9a5 5 0 0 1-10 0z"/><path d="M7 5.5H4a3.2 3.2 0 0 0 3.2 4.2M17 5.5h3a3.2 3.2 0 0 1-3.2 4.2"/><path d="M12 14v4M8 21h8M9.5 18h5"/></svg></span>ליגות ילדים</div></div>
+  <div class="tile" role="listitem" style="--i:7;--jx:-2px;--jy:6px;--r:-8deg;--fx:60px;--fr:-70deg;--z:1"><div class="face c-a"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.8.3 5 2.6 5 5.8"/></svg></span>קבוצות נוער</div></div>
+  <div class="tile" role="listitem" style="--i:4;--jx:5px;--jy:2px;--r:6deg;--fx:-120px;--fr:45deg;--z:2"><div class="face c-d"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="7.5" r="3.5"/><path d="M15.2 6c2 .2 3 2.2 2.3 4.3"/><path d="M5.5 21c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/></svg></span>קבוצות בנות</div></div>
+  <div class="tile" role="listitem" style="--i:9;--jx:-7px;--jy:-6px;--r:-4deg;--fx:150px;--fr:-40deg;--z:3"><div class="face c-c"><span class="ico"><svg viewBox="0 0 24 24"><path d="M3 9.5l9-6 9 6"/><path d="M5 21V9.5M19 21V9.5M2.5 21h19"/><path d="M9.5 21v-6h5v6"/><path d="M8 11.5h1.5M14.5 11.5H16"/></svg></span>מתנ״סים</div></div>
+  <div class="tile" role="listitem" style="--i:6;--jx:6px;--jy:4px;--r:-7deg;--fx:-170px;--fr:-55deg;--z:1"><div class="face c-a"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="9" cy="14.5" r="5.5"/><path d="M9 9h12v4.5h-6.5"/><circle cx="9" cy="14.5" r="1.5"/><path d="M5.5 10.2L4 4"/></svg></span>מאמנים פרטיים</div></div>
+  <div class="tile" role="listitem" style="--i:10;--jx:-3px;--jy:-4px;--r:5deg;--fx:90px;--fr:50deg;--z:2"><div class="face c-b"><span class="ico"><svg viewBox="0 0 24 24"><path d="M2 19.5V6h20v13.5"/><path d="M2 6l3 3.5h14L22 6M5 9.5v10M19 9.5v10M9.7 9.5v10M14.3 9.5v10M5 14.5h14"/></svg></span>שוערים</div></div>
+  <div class="tile" role="listitem" style="--i:8;--jx:4px;--jy:8px;--r:-5deg;--fx:-140px;--fr:-35deg;--z:3"><div class="face c-d"><span class="ico"><svg viewBox="0 0 24 24"><path d="M9.5 3.5h5l4 15.5h-13z"/><path d="M8 10h8M6.8 14.5h10.4"/><path d="M3 20.5h18"/></svg></span>אימון כושר</div></div>
+  <div class="tile" role="listitem" style="--i:11;--jx:-5px;--jy:2px;--r:7deg;--fx:170px;--fr:65deg;--z:1"><div class="face c-c"><span class="ico"><svg viewBox="0 0 24 24"><path d="M3 20.5L12 5l9 15.5z"/><path d="M9.3 20.5L12 15l2.7 5.5"/><path d="M12 5V2.5l2.8 1-2.8 1"/><path d="M1.5 20.5h21"/></svg></span>ימי גיבוש</div></div>
+  <div class="tile more" role="listitem" style="--i:12;--jx:0px;--jy:6px;--r:-2deg;--fx:0px;--fr:-20deg;--z:2"><div class="face"><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>כל מסגרת אחרת</div></div>
+ </div>
+</div></section>
+
+<section style="padding-top:20px"><div class="wrap split">
+ <div class="txt">
+  <div class="kicker">למאמנים</div>
+  <h2>פחות ניירת על הספסל.<br>יותר זמן עם הכדור.</h2>
+  <p>האימון מתוכנן מראש, הנוכחות נרשמת בהקשה, והדירוגים נשמרים תוך כדי משחק. בסוף האימון יש לכם תמונה מלאה — בלי לשבת בערב מול אקסל.</p>
+  <ul class="ticks"><li>ספריית תרגילים מוכנה לפי גיל, עם שרטוטים</li><li>אימון מתוכנן מראש, עם הערות לכל תרגיל</li><li>דוח קבוצה: מה לאמן בשבוע הבא ומי התקדם</li></ul>
+ </div>
+ <div class="shot"><div class="phone"><img src="assets/plan.webp" alt="תוכנית אימון ב-SINAI Coach" loading="lazy"></div></div>
+</div></section>
+
+<section id="managers" style="padding-top:20px"><div class="wrap split rev">
+ <div class="txt">
+  <div class="kicker">למנהלי מועדונים</div>
+  <h2>כל הקבוצות, כל המאמנים,<br>תמונה אחת.</h2>
+  <p>מעקב אחרי נוכחות, התקדמות שחקנים ותוכניות אימון בכל הקבוצות של המועדון — במקום אחד.</p>
+  <ul class="ticks"><li>כל הקבוצות והמאמנים של המועדון במקום אחד</li><li>הרשאות לפי תפקיד: מאמן, עוזר, מנהל</li><li>בתכנון: השוואת התקדמות בין קבוצות ושכבות גיל</li></ul>
+ </div>
+ <div class="shot"><div class="phone"><img src="assets/card.webp" alt="כרטיס שחקן ב-SINAI Coach" loading="lazy"></div></div>
+</div></section>
+
+<section id="parents" style="padding-top:20px"><div class="wrap">
+ <div class="sh"><div class="kicker">להורים ולשחקנים</div><h2>רואים את ההתקדמות.<br>מרגישים חלק מהקבוצה.</h2></div>
+ <div class="par">
+  <div class="pc"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="10" r="2"/><path d="M5.5 16c.5-1.8 1.6-2.7 3-2.7s2.5.9 3 2.7M14 9h4M14 13h3"/></svg></div><h3>כרטיס שחקן אישי</h3><p>הילד רואה את התכונות שלו משתפרות, מאימון לאימון.</p></div>
+  <div class="pc"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="M15.5 10.5l6-3v9l-6-3"/></svg></div><h3>אתגרים וחברים</h3><p>בתכנון: אתגרי ג׳אגלינג וסרטונים — באישור הורה.</p></div>
+  <div class="pc"><div class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E45B0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6.5 2 6.5H4S6 14 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></div><h3>עדכונים מהמאמן</h3><p>האימון הבא, יעדים אישיים והודעה ישירה למאמן.</p></div>
+ </div>
+</div></section>
+
+<section id="security" style="padding-top:20px"><div class="wrap"><div class="sec">
+ <svg class="shield" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12 2l8 3.5v6.2c0 5-3.4 8.6-8 10.3-4.6-1.7-8-5.3-8-10.3V5.5L12 2z"/></svg>
+ <div>
+  <div class="kicker">פרטיות ואבטחה</div>
+  <h2>המידע על הילדים<br>מוגן ופרטי.</h2>
+  <p>מדובר בילדים, ולכן כל שכבה ב-SINAI Coach בנויה כדי להגן עליהם.</p>
+ </div>
+ <div class="grid">
+  <div class="it"><b>כל אחד רואה רק את שלו</b><span>הרשאות לפי תפקיד: מאמן, מנהל, הורה ושחקן — ברמת מסד הנתונים.</span></div>
+  <div class="it"><b>אישור הורה לסרטונים</b><span>מסך הסכמה פשוט בכניסה הראשונה.</span></div>
+  <div class="it"><b>הצפנה בדרך ובמנוחה</b><span>תקשורת מוצפנת והנתונים שמורים מוצפנים בשרת.</span></div>
+  <div class="it"><b>הפרדה בין מועדונים</b><span>הנתונים של כל מועדון נגישים רק לאנשים שלו.</span></div>
+ </div>
+</div></div></section>
+
+<section id="setup" class="setup"><div class="wrap">
+ <div class="kicker">הקמה</div>
+ <h2 class="big"><span>ההקמה עלינו,</span><span>המגרש שלכם.</span></h2>
+ <div class="steps">
+  <div class="step"><div class="n">1</div><h3>מעלים את הקבוצות</h3><p>רשימות שחקנים מאקסל — אנחנו מסדרים.</p></div>
+  <div class="step"><div class="n">2</div><h3>מגדירים מאמנים והרשאות</h3><p>כל מאמן מקבל גישה לקבוצות שלו, וההורים מצטרפים בקישור.</p></div>
+  <div class="step"><div class="n">3</div><h3>יוצאים למגרש</h3><p>מוסיפים את SINAI Coach למסך הבית ומתחילים לאמן — בלי התקנות.</p></div>
+ </div>
+</div></section>
+
+<section id="contact" style="padding-top:0"><div class="wrap"><div class="cta">
+ <i class="deco" style="width:16px;height:16px;top:22px;left:38%" aria-hidden="true"></i><i class="deco" style="width:10px;height:10px;bottom:28px;left:8%;animation-delay:-1s" aria-hidden="true"></i><i class="deco" style="width:12px;height:12px;top:40%;right:46%;animation-delay:-2s" aria-hidden="true"></i>
+ <div><h2>בואו נראה את SINAI Coach<br>על הקבוצות שלכם.</h2><p>הדגמה קצרה, על המועדון שלכם. כתבו לנו: <span class="mail">hello@sinaicoach.app</span></p></div>
+ <div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn btn-lime" href="mailto:hello@sinaicoach.app?subject=%D7%94%D7%93%D7%92%D7%9E%D7%94%20%D7%A9%D7%9C%20SINAI%20Coach">לתיאום הדגמה</a><a class="btn btn-line" href="/app/">כניסה למערכת</a></div>
+</div></div></section>
+
+<footer><div class="wrap">
+ <a href="#" class="brand" aria-label="SINAI Coach"><img src="assets/icon.svg" alt="" style="width:26px;height:26px"><span class="word" style="font-size:17px"><b>SINAI</b><span> Coach</span></span></a>
+ <div>© <span id="yr">2026</span> SINAI Coach · <span class="mail" style="font-weight:400">hello@sinaicoach.app</span></div>
+</div></footer>
+<script>
+try{document.getElementById('yr').textContent=new Date().getFullYear();}catch(e){}
+(function(){
+ var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+ var cols=['#B9EE3E','#4D7CF0','#9DB8F7','#1E45B0','#B9EE3E'];
+ function rnd(a,b){return a+Math.random()*(b-a)}
+ function sp(cls,c,s){var e=document.createElement('i');e.className='sp '+cls;e.style.setProperty('--c',c);e.style.setProperty('--s',s+'px');return e}
+ /* occasional small sparks across the hero, kept away from the copy column */
+ var fx=document.getElementById('fx'),hero=document.querySelector('.hero'),on=true;
+ if(fx&&!reduce){
+  if('IntersectionObserver' in window){new IntersectionObserver(function(es){on=es[0].isIntersecting}).observe(hero)}
+  setInterval(function(){
+   if(!on||document.hidden)return;
+   var w=fx.clientWidth,h=fx.clientHeight,mob=w<980,x,y;
+   if(mob){x=rnd(.05,.95)*w;y=rnd(.62,.95)*h}else{x=rnd(.04,.42)*w;y=rnd(.15,.85)*h}
+   var b=document.createElement('div');b.className='burst';b.style.cssText='position:absolute;left:'+x+'px;top:'+y+'px';
+   for(var j=0;j<6;j++){var a=j/6*Math.PI*2+rnd(-.3,.3),r=rnd(24,54),st=j%2===0;var e=sp(st?'st':'dot',cols[(j+Math.floor(x))%cols.length],st?rnd(8,12):rnd(4,6));
+    e.style.setProperty('--dx',(Math.cos(a)*r).toFixed(0)+'px');e.style.setProperty('--dy',(Math.sin(a)*r).toFixed(0)+'px');b.appendChild(e)}
+   fx.appendChild(b);setTimeout(function(){b.remove()},1500);
+  },2600);
+ }
+ /* tossed team tiles */
+ var toss=document.getElementById('toss');
+ if(toss){
+  if(reduce||!('IntersectionObserver' in window)){toss.classList.add('in')}
+  else{var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){toss.classList.add('in');io.disconnect()}})},{threshold:.25});io.observe(toss)}
+ }
+})();
+</script>
 </body>
 </html>
-

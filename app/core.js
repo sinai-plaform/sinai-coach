@@ -32,6 +32,7 @@ async function useToken(th){
   return error ? {error:error.message} : {user:data.user};
 }
 
+const APP_VERSION='2.0.0';
 const S = { user:null, club:null, role:null, teams:[], team:null, players:[], attrs:[], dbDrills:[],
             session:null, sessionDrills:[], attendance:{}, match:null, view:'home', online:navigator.onLine };
 
@@ -138,7 +139,7 @@ function svgDiag(d,cls){
     case 'shot':later.push(OP(it)+`<polyline points="${poly(it.pts)}" fill="none" stroke="#fff" stroke-width="1.5" marker-end="url(#aW)"/>`+CL(it));break;
     case 'p':later.push(`<circle cx="${it.x}" cy="${it.y}" r="3.3" fill="${TEAMC[it.s]||TEAMC.a}" stroke="#fff" stroke-width=".7"/>`+(it.n?`<text x="${it.x}" y="${it.y+1.2}" font-size="${String(it.n).length>1?2.4:3.2}" fill="#fff" text-anchor="middle" font-weight="700">${esc(it.n)}</text>`:(it.s==='co'?`<text x="${it.x}" y="${it.y+1.2}" font-size="3" fill="#fff" text-anchor="middle" font-weight="700">מ</text>`:'')));break;
     case 'ball':later.push(`<circle cx="${it.x}" cy="${it.y}" r="1.7" fill="#fff" stroke="#1E1E1E" stroke-width=".45"/><circle cx="${it.x}" cy="${it.y}" r=".6" fill="#1E1E1E"/>`);break;
-    case 'badge':later.push(`<circle cx="${it.x}" cy="${it.y}" r="2.6" fill="${it.hi?'#F0813F':'#18221C'}" stroke="#fff" stroke-width=".4"/><text x="${it.x}" y="${it.y+1.1}" font-size="3" fill="#fff" text-anchor="middle" font-weight="700">${esc(it.n)}</text>`);break;
+    case 'badge':later.push(`<circle cx="${it.x}" cy="${it.y}" r="2.6" fill="${it.hi?'#1E45B0':'#0E1B3D'}" stroke="#fff" stroke-width=".4"/><text x="${it.x}" y="${it.y+1.1}" font-size="3" fill="#fff" text-anchor="middle" font-weight="700">${esc(it.n)}</text>`);break;
     case 'txt':later.push(`<text x="${it.x}" y="${it.y}" font-size="3.4" fill="#fff" text-anchor="middle" paint-order="stroke" stroke="#0B2A18" stroke-width=".9" stroke-opacity=".7">${esc(it.s)}</text>`);break;
   }});
   return s+later.join('')+'</svg>';
@@ -275,7 +276,7 @@ async function bootstrap(){
 function splash(t){
   $('#nav').classList.add('hide');
   $('#app').innerHTML = `<div class="wrap" style="padding-top:90px;text-align:center">
-    <div style="font-size:40px">⚽</div><p class="muted" style="margin-top:10px">${esc(t)}</p></div>`;
+    <img src="icon.svg" alt="" style="width:56px;height:56px"><p class="muted" style="margin-top:12px">${esc(t)}</p></div>`;
 }
 async function loadTeam(){
   if(!S.team){S.players=[];return;}
@@ -358,7 +359,7 @@ function renderLogin(err){
     if(mode==='in') body=`
       <label class="f">טלפון או שם משתמש<input id="id" autocomplete="username" autocapitalize="off" dir="ltr" placeholder="050-0000000"></label>
       <label class="f">סיסמה<input id="pw" type="password" autocomplete="current-password"></label>
-      <button class="btn primary big" id="doBtn">כניסה</button>
+      <button class="btn lime big" id="doBtn">כניסה</button>
       <button class="btn ghost sm" id="toOtp">כניסה ראשונה / שכחתי סיסמה</button>`;
     else if(!sent) body=`
       ${mode==='signup'?'<label class="f">שם מלא<input id="nm" autocomplete="name"></label>':''}
@@ -378,9 +379,9 @@ function renderLogin(err){
       <button class="btn ghost sm" id="reBtn">מספר אחר / שליחה מחדש</button>`;
     $('#app').innerHTML=`<div class="wrap" style="max-width:420px;padding-top:50px">
     <div style="text-align:center;margin-bottom:20px">
-      <div style="font-size:44px">⚽</div>
-      <h1 style="margin-top:8px">SINAI Coach</h1>
-      <p class="muted sm">${head[mode]}</p>
+      <div class="brandmark"><img src="icon.svg" alt="">
+      <h1 class="brandword" aria-label="SINAI Coach"><b>SINAI</b><span> Coach</span></h1></div>
+      <p class="muted sm" style="margin-top:8px">${head[mode]}</p>
     </div>
     <div class="card stack">
       <div id="err" class="alert hide"></div>

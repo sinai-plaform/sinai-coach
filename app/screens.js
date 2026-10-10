@@ -228,7 +228,7 @@ function renderPlanList(){
   el.innerHTML = PLAN.items.length? PLAN.items.map((it,i)=>{
     const d=drillById(it.id)||{name:'תרגיל',cat:'tech'};
     return `<div class="prow" style="flex-wrap:wrap"><div class="av">${i+1}</div>
-      <div class="pname" onclick="showDrill('${it.id}',${i})" style="cursor:pointer"><b>${esc(d.name)}</b>
+      <div class="pname" onclick="showDrill('${it.id}',${i})" style="cursor:pointer;min-width:160px"><b>${esc(d.name)}</b>
         <span class="xs muted">${esc(CATS[d.cat]?.short||'')}${it.notes?' · 📝 '+esc(it.notes.slice(0,60)):''}</span></div>
       ${done?`<span class="pill">${it.min}׳</span>`:`
       <input type="number" class="num" style="width:54px;padding:5px;text-align:center" value="${it.min}" onchange="setMin(${i},this.value)">
